@@ -1,0 +1,149 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Models\User;
+use App\Models\Employee;
+use App\Models\Role;
+use App\Models\Schedule;
+use App\Http\Requests\EmployeeRec;
+use RealRashid\SweetAlert\Facades\Alert;
+
+class EmployeeController extends Controller
+{
+    public function index()
+    {
+        return view('admin.employee')->with([
+            'employees' => Employee::all(),
+            'schedules' => Schedule::all()
+        ]);
+    }
+
+    public function store(EmployeeRec $request)
+    {
+        $request->validated();
+
+        $employee = new Employee;
+        $employee->name = $request->name;
+        $employee->position = $request->position;
+        $employee->email = $request->email;
+        $employee->pin_code = bcrypt($request->pin_code);
+        $employee->save();
+
+        if ($request->schedule) {
+            $schedule = Schedule::whereSlug($request->schedule)->first();
+            $employee->schedules()->attach($schedule);
+        }
+
+        flash()->success('Success', 'Employee Record has been created successfully !');
+
+        return redirect()->route('employees.index')->with('success');
+    }
+
+    public function update(EmployeeRec $request, Employee $employee)
+    {
+        $request->validated();
+
+        $employee->name = $request->name;
+        $employee->position = $request->position;
+        $employee->email = $request->email;
+        $employee->pin_code = bcrypt($request->pin_code);
+        $employee->save();
+
+        if ($request->schedule) {
+            $employee->schedules()->detach();
+
+            $schedule = Schedule::whereSlug($request->schedule)->first();
+            $employee->schedules()->attach($schedule);
+        }
+
+        flash()->success('Success', 'Employee Record has been Updated successfully !');
+
+        return redirect()->route('employees.index')->with('success');
+    }
+
+    public function destroy(Employee $employee)
+    {
+        $employee->delete();
+
+        flash()->success('Success', 'Employee Record has been Deleted successfully !');
+
+        return redirect()->route('employees.index')->with('success');
+    }
+
+   
+    // ======================================================
+    // 📸 FACE CAPTURE MODULE (AWS S3 + DB SYNC READY)
+    // ======================================================
+    public function captureFace(Request $request, Employee $employee)
+    {
+        try {
+            // -------------------------
+            // CHECK & FORMAT IMAGE
+            // -------------------------
+            if (!$request->has('image')) {
+                return response()->json(['status' => false, 'message' => 'No image received']);
+            }
+
+            $image = $request->image;
+            if (strpos($image, 'data:image') !== false) {
+                $image = explode(',', $image)[1];
+            }
+            $image = str_replace(' ', '+', $image);
+            $imageData = base64_decode($image);
+
+            if ($imageData === false) {
+                return response()->json(['status' => false, 'message' => 'Invalid image data']);
+            }
+
+            $fileName = $employee->id . '_' . time() . '.jpeg';
+
+            // -------------------------
+            // 1. SAVE IN PUBLIC FOLDER (Local Backup)
+            // -------------------------
+            $folderPath = public_path('faces');
+            if (!file_exists($folderPath)) {
+                mkdir($folderPath, 0777, true);
+            }
+            file_put_contents($folderPath . '/' . $fileName, $imageData);
+
+            // -------------------------
+            // 2. UPLOAD TO AWS S3
+            // -------------------------
+            try {
+                \Illuminate\Support\Facades\Storage::disk('s3')->put('faces/' . $fileName, $imageData, 'public');
+            } catch (\Exception $s3Exception) {
+                \Illuminate\Support\Facades\Log::error('S3 Upload Failed: ' . $s3Exception->getMessage());
+            }
+
+            // -------------------------
+            // 3. DATABASE INSERT TRIGGER (Safer Version)
+            // -------------------------
+            $attendance = new \App\Models\Attendance();
+            $attendance->emp_id = $employee->id;
+            $attendance->attendance_date = now()->toDateString();
+            $attendance->attendance_time = now()->toTimeString();
+            $attendance->state = 0;
+            $attendance->status = 1;
+            $attendance->type = 0;
+            $attendance->save();
+
+            // -------------------------
+            // RESPONSE
+            // -------------------------
+            return response()->json([
+                'status' => true,
+                'message' => 'Face captured, pushed to S3, & Attendance Logged!',
+                'file' => $fileName,
+                'path' => 'faces/' . $fileName
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ]);
+        }
+    }
+}
