@@ -50,9 +50,9 @@
                                 <thead>
                                     <tr>
                                         <th data-priority="1">ID</th>
-                                        <th data-priority="2">Shift</th>
-                                        <th data-priority="3">Time In</th>
-                                        <th data-priority="4">Time Out</th>
+                                        <th data-priority="2">Shift Category Name</th>
+<th data-priority="3">Expected Start Time</th>
+<th data-priority="4">Expected End Time</th>
                                         <th data-priority="5">Action</th>
                                      
 

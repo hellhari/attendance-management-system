@@ -69,11 +69,11 @@
                                                             <td>{{$employee->created_at}}</td>
                                                            <td>
 
-    <a href="#edit{{$employee->name}}" data-toggle="modal" class="btn btn-success btn-sm">
+    <a href="#edit{{$employee->id}}" data-toggle="modal" class="btn btn-success btn-sm">
         <i class='fa fa-edit'></i>
     </a>
 
-    <a href="#delete{{$employee->name}}" data-toggle="modal" class="btn btn-danger btn-sm">
+    <a href="#delete{{$employee->id}}" data-toggle="modal" class="btn btn-danger btn-sm">
         <i class='fa fa-trash'></i>
     </a>
 

@@ -17,7 +17,7 @@
 @section('content')
                    <div class="row">
                             <div class="col-xl-3 col-md-6">
-                                <div class="card mini-stat bg-primary text-white">
+                                <div class="card mini-stat bg-primary text-white" onclick="window.location.href='/employees';" style="cursor: pointer;">
                                     <div class="card-body">
                                         <div class="mb-4">
                                             <div class="float-left mini-stat-img mr-4">
@@ -38,7 +38,7 @@
                                 </div>
                             </div>
                             <div class="col-xl-3 col-md-6">
-                                <div class="card mini-stat bg-primary text-white">
+                                <div class="card mini-stat bg-primary text-white" onclick="window.location.href='/check';" style="cursor: pointer;">
                                     <div class="card-body">
                                         <div class="mb-4">
                                             <div class="float-left mini-stat-img mr-4">
@@ -60,7 +60,7 @@
                                 </div>
                             </div>
                             <div class="col-xl-3 col-md-6">
-                                <div class="card mini-stat bg-primary text-white">
+                                <div class="card mini-stat bg-primary text-white" onclick="window.location.href='/check';" style="cursor: pointer;">
                                     <div class="card-body">
                                         <div class="mb-4">
                                             <div class="float-left mini-stat-img mr-4">
@@ -82,7 +82,7 @@
                                 </div>
                             </div>
                             <div class="col-xl-3 col-md-6">
-                                <div class="card mini-stat bg-primary text-white">
+                                <div class="card mini-stat bg-primary text-white" onclick="window.location.href='/latetime';" style="cursor: pointer;">
                                     <div class="card-body">
                                         <div class="mb-4">
                                             <div class="float-left mini-stat-img mr-4">
@@ -207,10 +207,11 @@
 @endsection
 
 @section('script')
-<!--Chartist Chart-->
-<script src="{{ URL::asset('plugins/chartist/js/chartist.min.js') }}"></script>
-<script src="{{ URL::asset('plugins/chartist/js/chartist-plugin-tooltip.min.js') }}"></script>
-<!-- peity JS -->
-<script src="{{ URL::asset('plugins/peity-chart/jquery.peity.min.js') }}"></script>
-<script src="{{ URL::asset('assets/pages/dashboard.js') }}"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css">
+    <script src="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/chartist-plugin-tooltips@0.0.17/dist/chartist-plugin-tooltip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peity/3.3.0/jquery.peity.min.js"></script>
+
+    <script src="{{ URL::asset('assets/pages/dashboard.js') }}"></script>
 @endsection

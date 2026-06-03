@@ -52,7 +52,7 @@ return [
     |
     */
 
-    'url' => env('APP_URL', 'http://localhost'),
+'url' => 'https://congenial-journey-jj5r5gg4j99vcq4xp-8000.app.github.dev',
 
     'asset_url' => env('ASSET_URL', null),
 

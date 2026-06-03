@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -9,6 +8,8 @@ use App\Models\Role;
 use App\Models\Schedule;
 use App\Http\Requests\EmployeeRec;
 use RealRashid\SweetAlert\Facades\Alert;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class EmployeeController extends Controller
 {
@@ -97,22 +98,18 @@ class EmployeeController extends Controller
                 return response()->json(['status' => false, 'message' => 'Invalid image data']);
             }
 
-            $fileName = $employee->id . '_' . time() . '.jpeg';
-
             // -------------------------
             // 1. SAVE IN PUBLIC FOLDER (Local Backup)
             // -------------------------
-            $folderPath = public_path('faces');
-            if (!file_exists($folderPath)) {
-                mkdir($folderPath, 0777, true);
-            }
-            file_put_contents($folderPath . '/' . $fileName, $imageData);
+            $safeName = Str::slug($employee->name); 
+            $fileName = $safeName . '_' . $employee->id . '_' . time() . '.jpeg';
 
             // -------------------------
             // 2. UPLOAD TO AWS S3
             // -------------------------
             try {
-                \Illuminate\Support\Facades\Storage::disk('s3')->put('faces/' . $fileName, $imageData, 'public');
+                // THE FIX: The 'public' parameter has been removed completely.
+                \Illuminate\Support\Facades\Storage::disk('s3')->put('faces/' . $fileName, $imageData);
             } catch (\Exception $s3Exception) {
                 \Illuminate\Support\Facades\Log::error('S3 Upload Failed: ' . $s3Exception->getMessage());
             }

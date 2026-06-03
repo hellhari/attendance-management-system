@@ -11,6 +11,7 @@ use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\CheckController;
 use App\Http\Controllers\BiometricDeviceController;
+use App\Http\Controllers\FaceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -129,6 +130,18 @@ Route::group(['middleware' => ['auth', 'Role'], 'roles' => ['admin']], function 
     Route::get('/attendance/export/excel', [AttendanceController::class, 'exportExcel'])->name('attendance.export.excel');
     Route::get('/attendance/export/pdf', [AttendanceController::class, 'exportPdf'])->name('attendance.export.pdf');
 });
+/*
+|--------------------------------------------------------------------------
+| DAILY BIOMETRIC KIOSK (ODD/EVEN CHECK-IN TOGGLE)
+|--------------------------------------------------------------------------
+*/
+// 1. The UI Page (The Kiosk Camera)
+Route::get('/kiosk', function () {
+    return view('admin.kiosk'); 
+})->name('kiosk.view');
+
+// 2. The Backend Logic (The AWS Face Match & DB Toggle)
+Route::post('/scan-face', [FaceController::class, 'scanFace'])->name('scan.face');
 
 /*
 |--------------------------------------------------------------------------
