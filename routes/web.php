@@ -129,7 +129,23 @@ Route::group(['middleware' => ['auth', 'Role'], 'roles' => ['admin']], function 
     Route::get('/attendance/chart-data', [AttendanceController::class, 'chartData'])->name('attendance.chart');
     Route::get('/attendance/export/excel', [AttendanceController::class, 'exportExcel'])->name('attendance.export.excel');
     Route::get('/attendance/export/pdf', [AttendanceController::class, 'exportPdf'])->name('attendance.export.pdf');
+
+    // --- PHASE 3: SETTINGS & RESOLUTIONS API ---
+    // 1. The UI View for Settings
+    Route::get('/settings', function () {
+        return view('admin.settings');
+    })->name('admin.settings');
+
+    // 2. Fetch pending missed checkouts when the page loads
+    Route::get('/api/resolutions/pending', [AttendanceController::class, 'getPendingResolutions'])->name('api.resolutions.pending');
+    
+    // 3. Approve or deny a 16-hour cap flag
+    Route::post('/api/attendance/resolve/{id}', [AttendanceController::class, 'resolveMissedScan'])->name('api.attendance.resolve');
+    
+    // 4. Update the arrival grace period
+    Route::post('/api/settings/grace-period', [AttendanceController::class, 'updateGracePeriod'])->name('api.settings.grace_period');
 });
+
 /*
 |--------------------------------------------------------------------------
 | DAILY BIOMETRIC KIOSK (ODD/EVEN CHECK-IN TOGGLE)

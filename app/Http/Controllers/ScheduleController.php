@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Schedule;
 use App\Http\Requests\ScheduleEmp;
 use Illuminate\Support\Str;
+use Carbon\Carbon; // ✅ Imported Carbon for chronological math
 
 class ScheduleController extends Controller
 {
@@ -19,12 +20,21 @@ class ScheduleController extends Controller
         $request->validated();
 
         $schedule = new Schedule();
-
-        // ✅ FIXED SLUG (auto clean)
         $schedule->slug = Str::slug($request->slug);
 
-        $schedule->time_in = $request->time_in;
-        $schedule->time_out = $request->time_out;
+        // ✅ OVERNIGHT SHIFT MATH (+1 Day Logic)
+        $time_in = Carbon::parse($request->time_in);
+        $time_out = Carbon::parse($request->time_out);
+
+        // If checkout time is earlier than check-in time, it crosses midnight
+        if ($time_out->lessThan($time_in)) {
+            $time_out->addDay(); 
+        }
+
+        // Carbon automatically sanitizes the format to 'HH:MM:SS' for the database
+        $schedule->time_in = $time_in->format('H:i');
+        $schedule->time_out = $time_out->format('H:i');
+        
         $schedule->save();
 
         flash()->success('Success', 'Schedule has been created successfully !');
@@ -36,15 +46,20 @@ class ScheduleController extends Controller
     {
         $request->validated();
 
-        // optional safety formatting (keep if needed)
-        $request['time_in'] = str_split($request->time_in, 5)[0];
-        $request['time_out'] = str_split($request->time_out, 5)[0];
-
-        // ✅ FIXED SLUG
         $schedule->slug = Str::slug($request->slug);
 
-        $schedule->time_in = $request->time_in;
-        $schedule->time_out = $request->time_out;
+        // ✅ APPLY THE SAME OVERNIGHT MATH FOR UPDATES
+        $time_in = Carbon::parse($request->time_in);
+        $time_out = Carbon::parse($request->time_out);
+
+        if ($time_out->lessThan($time_in)) {
+            $time_out->addDay(); 
+        }
+
+        // This permanently removes the need for your old "str_split" hack
+        $schedule->time_in = $time_in->toTimeString();
+        $schedule->time_out = $time_out->toTimeString();
+        
         $schedule->save();
 
         flash()->success('Success', 'Schedule has been updated successfully !');

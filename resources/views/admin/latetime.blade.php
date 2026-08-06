@@ -1,9 +1,7 @@
 @extends('layouts.master')
 
 @section('css')
-<!-- Table css -->
-<link href="{{ URL::asset('plugins/RWD-Table-Patterns/dist/css/rwd-table.min.css') }}" rel="stylesheet" type="text/css"
-    media="screen">
+<link href="{{ URL::asset('plugins/RWD-Table-Patterns/dist/css/rwd-table.min.css') }}" rel="stylesheet" type="text/css" media="screen">
 @endsection
 
 @section('breadcrumb')
@@ -12,16 +10,12 @@
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="javascript:void(0);">Home</a></li>
         <li class="breadcrumb-item"><a href="javascript:void(0);">Late Time</a></li>
-
-
     </ol>
 </div>
 @endsection
 
 @section('button')
 <a href="/attendance" class="btn btn-primary btn-sm btn-flat"><i class="mdi mdi-plus mr-2"></i>Attendance Table</a>
-
-
 @endsection
 
 @section('content')
@@ -35,7 +29,6 @@
                 <div class="table-rep-plugin">
                     <div class="table-responsive mb-0" data-pattern="priority-columns">
                         <table id="datatable-buttons" class="table table-striped table-bordered dt-responsive nowrap" style="border-collapse: collapse; border-spacing: 0; width: 100%;">
-                                        
                             <thead>
                                 <tr>
                                     <th data-priority="1">Date</th>
@@ -44,43 +37,33 @@
                                     <th data-priority="4">Late Time Duration</th>
                                     <th data-priority="6">Time In</th>
                                     <th data-priority="7">Time Out</th>
-
-
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($latetimes as $latetime)
-
+                                @forelse ($latetimes as $lateRecord)
                                 <tr>
-                                    <td>{{ $latetime->latetime_date }}</td>
-                                    <td>{{ $latetime->emp_id }}</td>
-                                    <td>{{ $latetime->employee->name }}</td>
-                                    <td>{{ $latetime->duration }}</td>
-                                    <td>{{ $latetime->employee->schedules->first()->time_in }} </td>
-                                    <td>{{ $latetime->employee->schedules->first()->time_out }}</td>
+                                    <td>{{ \Carbon\Carbon::parse($lateRecord->attendance_date)->format('M d, Y') }}</td>
+                                    <td class="font-weight-bold">{{ $lateRecord->emp_id }}</td>
+                                    <td>{{ optional($lateRecord->employee)->name ?? 'Emp #'.$lateRecord->emp_id }}</td>
+                                    <td class="text-danger fw-bold">{{ $lateRecord->formatted_late_time }}</td>
+                                    <td>{{ $lateRecord->clean_time_in }}</td>
+                                    <td>{{ $lateRecord->clean_time_out }}</td>
                                 </tr>
-
-                                @endforeach
-
-
+                                @empty
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">No late arrivals logged! Everyone is on time.</td>
+                                </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
-    </div> <!-- end col -->
-</div> <!-- end row -->
-
-@endsection
-
+    </div> </div> @endsection
 
 @section('script')
-<!-- Responsive-table-->
 <script src="{{ URL::asset('plugins/RWD-Table-Patterns/dist/js/rwd-table.min.js') }}"></script>
-@endsection
-
-@section('script')
 <script>
     $(function () {
         $('.table-responsive').responsiveTable({

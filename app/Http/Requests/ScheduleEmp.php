@@ -25,7 +25,7 @@ class ScheduleEmp extends FormRequest
     {
         return [
             'slug' => 'required|string|min:3|max:32|alpha_dash',
-            'time_in' => 'required|before:time_out',
+            'time_in' => 'required', // Removed the restrictive 'before' rule
             'time_out' => 'required',
         ];
     }

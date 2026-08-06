@@ -2,223 +2,146 @@
 
 namespace App\Http\Controllers;
 
-use DateTime;
-use Carbon\Carbon;
-use App\Models\Employee;
-use App\Models\Latetime;
-use App\Models\Attendance;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use App\Models\Attendance;
+use App\Models\BreakLog;
+use Carbon\Carbon;
 
 class AttendanceController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | SHOW ATTENDANCE
-    |--------------------------------------------------------------------------
-    */
+    /**
+     * Display the main Attendance Logs page.
+     */
     public function index()
     {
-        return view('admin.attendance')
-            ->with(['attendances' => Attendance::orderBy('created_at', 'desc')->get()]);
+        // 1. Fetch the data
+        $attendances = Attendance::all(); 
+        
+        // 2. Point to the 'attendance' table view, NOT the 'index' dashboard view
+        return view('admin.attendance', compact('attendances')); 
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SHOW LATE TIME
-    |--------------------------------------------------------------------------
-    */
     public function indexLatetime()
     {
-        return view('admin.latetime')
-            ->with(['latetimes' => Latetime::orderBy('created_at', 'desc')->get()]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | DASHBOARD 
-    |--------------------------------------------------------------------------
-    */
-    public function dashboard()
-    {
-        $todayAttendance = Attendance::whereDate('created_at', now())->count();
-        $employees = Employee::count();
-        $lateToday = Attendance::where('status', 0)
-            ->whereDate('created_at', now())
-            ->count();
-
-        return view('admin.dashboard', compact('todayAttendance', 'employees', 'lateToday'));
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | PHASE 2: AI FACE ATTENDANCE API (PYTHON CALLS THIS)
-    |--------------------------------------------------------------------------
-    */
-    public function store(Request $request)
-    {
-        $emp_id = $request->emp_id;
+        // --- 1. SET YOUR SHIFT START TIME HERE ---
+        // Change this to match Pragnaware's official start time!
+        $standardStartTime = '09:30:00'; 
         
-        if (!$emp_id) {
-            return response()->json(['status' => false, 'message' => 'Employee ID required']);
-        }
+        // Fetch all attendances (eager loading employee data if the relationship exists)
+        $allAttendances = Attendance::with('employee')->orderBy('attendance_date', 'desc')->get();
+        $latetimes = collect(); // Create an empty bucket to hold the late records
+// --- 2. ISOLATE MORNING ARRIVALS ---
+        // Group safely by converting the Date object into a strict text string
+        $groupedAttendances = $allAttendances->groupBy(function($item) {
+            return \Carbon\Carbon::parse($item->attendance_date)->format('Y-m-d');
+        });
 
-        $employee = Employee::where('id', $emp_id)->first();
-        if (!$employee) {
-            return response()->json(['status' => false, 'message' => 'Employee not found']);
-        }
+        foreach ($groupedAttendances as $date => $dayRecords) {
+            // Group safely by converting the Employee ID into a strict text string
+            $employeeFirstScans = $dayRecords->groupBy(function($item) {
+                return (string) $item->emp_id;
+            })->map(function ($employeeRecords) {
+                return $employeeRecords->sortBy('attendance_time')->first();
+            });
 
-        $now = Carbon::now();
-        $timeString = $now->format('H:i');
-        $dateString = $now->toDateString();
-
-        // 1. DETERMINE CURRENT STATE
-        $attendance = Attendance::where('emp_id', $emp_id)
-            ->whereDate('attendance_date', $dateString)
-            ->first();
-
-        $nextState = 'Checked In';
-        $folderPrefix = 'face_logins';
-
-        if ($attendance) {
-            if ($attendance->current_state === 'Checked In') {
-                $nextState = 'On Break';
-                $folderPrefix = 'face_breaks';
-            } elseif ($attendance->current_state === 'On Break') {
-                $nextState = 'Returned';
-                $folderPrefix = 'face_returns';
-            } elseif ($attendance->current_state === 'Returned') {
-                $nextState = 'Checked Out';
-                $folderPrefix = 'face_logouts';
-            } else {
-                return response()->json(['status' => false, 'message' => 'Shift already completed today.']);
-            }
-        }
-
-        // 2. THE STORAGE STEP (AWS S3)
-        $s3FilePath = null;
-        if ($request->hasFile('face_image')) {
-            $fileName = strtolower(str_replace(' ', '_', $nextState)) . "_{$dateString}_{$timeString}.jpg";
-            $s3FilePath = "{$folderPrefix}/{$emp_id}/{$fileName}";
-            Storage::disk('s3')->put($s3FilePath, file_get_contents($request->file('face_image')));
-        }
-
-        // 3. THE DATABASE STEP
-        if (!$attendance) {
-            // First punch of the day
-            $attendance = Attendance::create([
-                'emp_id' => $emp_id,
-                'attendance_date' => $dateString,
-                'attendance_time' => $now->toTimeString(),
-                'state' => 0,
-                'status' => 1,
-                'type' => 0,
-                'current_state' => $nextState,
-                'punch_log' => ['check_in' => $timeString]
-            ]);
-
-            // Run existing late calculation
-            self::lateTimeDevice($now->toDateTimeString(), $employee);
-
-        } else {
-            // Updating state for Breaks/Logouts
-            $punchLog = is_array($attendance->punch_log) ? $attendance->punch_log : [];
-            
-            if ($nextState === 'On Break') $punchLog['break_start'] = $timeString;
-            if ($nextState === 'Returned') $punchLog['break_end'] = $timeString;
-            
-            if ($nextState === 'Checked Out') {
-                $attendance->check_out_time = $now->toTimeString();
-                $punchLog['check_out'] = $timeString;
-
-                // --- CARBON MATH ---
-                $checkIn = Carbon::parse($attendance->attendance_time);
-                $totalMinutes = $now->diffInMinutes($checkIn);
+           // --- 3. CALCULATE LATE TIME ---
+            foreach ($employeeFirstScans as $firstScan) {
                 
-                $breakMinutes = 0;
-                if (isset($punchLog['break_start']) && isset($punchLog['break_end'])) {
-                    $breakStart = Carbon::parse($dateString . ' ' . $punchLog['break_start']);
-                    $breakEnd = Carbon::parse($dateString . ' ' . $punchLog['break_end']);
-                    $breakMinutes = $breakEnd->diffInMinutes($breakStart);
+                // FIX: We use the $date variable from the outer loop because it is already a clean 'Y-m-d' string. 
+                // This prevents the "Double time" crash!
+                $timeIn = \Carbon\Carbon::parse($date . ' ' . $firstScan->attendance_time);
+                $shiftStart = \Carbon\Carbon::parse($date . ' ' . $standardStartTime);
+
+                if ($timeIn->greaterThan($shiftStart)) {
+                    // Employee arrived after the start time! Calculate the difference.
+                    $lateMinutes = $shiftStart->diffInMinutes($timeIn);
+                    
+                    $hours = floor($lateMinutes / 60);
+                    $mins = $lateMinutes % 60;
+                    
+                    // Attach the math directly to the record for the Blade file
+                    $firstScan->formatted_late_time = $hours > 0 ? "{$hours}h {$mins}m" : "{$mins} mins";
+                    $firstScan->clean_time_in = $timeIn->format('h:i A');
+                    
+                    if ($firstScan->check_out_time) {
+                        // We must use $date here as well so the Check-Out time doesn't crash either!
+                        $firstScan->clean_time_out = \Carbon\Carbon::parse($date . ' ' . $firstScan->check_out_time)->format('h:i A');
+                    } else {
+                        $firstScan->clean_time_out = 'Still Working';
+                    }
+
+                    $latetimes->push($firstScan); // Push it to our Late table bucket!
                 }
-
-                $attendance->worked_minutes = $totalMinutes - $breakMinutes;
-                $attendance->shift_status = ($attendance->worked_minutes >= 480) ? 'Full Shift' : 'Partial Shift';
             }
+        }
+        
+        return view('admin.latetime', compact('latetimes'));
+    }
 
-            $attendance->current_state = $nextState;
-            $attendance->punch_log = $punchLog;
+    /**
+     * Handle the biometric face scan check-in/check-out.
+     */
+    public function store(Request $request) 
+    {
+        $nextState = $request->input('state');
+        $attendance = Attendance::find($request->input('attendance_id'));
+        $emp_id = $request->input('emp_id');
+        $now = Carbon::now();
+
+        // --- FACE SCAN STATE LOGIC ---
+        if ($nextState === 'On Break') {
+            \App\Models\BreakLog::create([
+                'attendance_id' => $attendance->id,
+                'emp_id' => $emp_id,
+                'break_start' => $now,
+            ]);
+            
+            $attendance->shift_status = 'On Break';
             $attendance->save();
         }
 
-        return response()->json([
-            'status' => true,
-            'action' => strtoupper(str_replace(' ', '_', $nextState)),
-            'message' => "{$nextState} successful",
-            's3_path' => $s3FilePath,
-            'data' => $attendance
-        ]);
-    }
+        if ($nextState === 'Returned') {
+            $openBreak = \App\Models\BreakLog::where('attendance_id', $attendance->id)
+                ->whereNull('break_end')
+                ->latest('break_start')
+                ->first();
 
-    /*
-    |--------------------------------------------------------------------------
-    | LATE TIME CALCULATION
-    |--------------------------------------------------------------------------
-    */
-    public static function lateTimeDevice($att_dateTime, Employee $employee)
-    {
-        try {
-            if (!$employee->schedules || $employee->schedules->isEmpty()) {
-                return;
+            if ($openBreak) {
+                $openBreak->break_end = $now;
+                $openBreak->duration_minutes = $now->diffInMinutes(\Carbon\Carbon::parse($openBreak->break_start));
+                $openBreak->save();
+            }
+            
+            $attendance->shift_status = 'Working';
+            $attendance->save();
+        }
+
+        if ($nextState === 'Checked Out') {
+            $attendance->check_out_time = $now->toTimeString();
+
+            $openBreak = \App\Models\BreakLog::where('attendance_id', $attendance->id)
+                ->whereNull('break_end')
+                ->latest('break_start')
+                ->first();
+
+            if ($openBreak) {
+                $openBreak->break_end = $now;
+                $openBreak->duration_minutes = $now->diffInMinutes(\Carbon\Carbon::parse($openBreak->break_start));
+                $openBreak->save();
             }
 
-            $attendance_time = new DateTime($att_dateTime);
-            $checkin = new DateTime($employee->schedules->first()->time_in);
+            $exactCheckInString = $attendance->attendance_date . ' ' . $attendance->attendance_time;
+            $checkIn = \Carbon\Carbon::parse($exactCheckInString);
+            
+            $totalMinutes = $checkIn->diffInMinutes($now);
+            $breakMinutes = \App\Models\BreakLog::where('attendance_id', $attendance->id)->sum('duration_minutes');
 
-            $difference = $checkin->diff($attendance_time)->format('%H:%I:%S');
-
-            $latetime = new Latetime();
-            $latetime->emp_id = $employee->id;
-            $latetime->duration = $difference;
-            $latetime->latetime_date = date('Y-m-d', strtotime($att_dateTime));
-            $latetime->save();
-
-        } catch (\Exception $e) {
-            // silent fail
-        }
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CHART DATA & EXPORTS
-    |--------------------------------------------------------------------------
-    */
-    public function chartData()
-    {
-        $days = [];
-        $counts = [];
-
-        for ($i = 6; $i >= 0; $i--) {
-            $date = now()->subDays($i)->toDateString();
-            $days[] = $date;
-            $counts[] = Attendance::whereDate('attendance_date', $date)->count();
+            $attendance->worked_minutes = $totalMinutes - $breakMinutes;
+            $attendance->shift_status = ($attendance->worked_minutes >= 480) ? 'Full Shift' : 'Partial Shift';
+            
+            $attendance->save();
         }
 
-        return response()->json(['days' => $days, 'counts' => $counts]);
-    }
-
-    public function exportExcel()
-    {
-        return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Exports\AttendanceExport,
-            'attendance.xlsx'
-        );
-    }
-
-    public function exportPdf()
-    {
-        $data = Attendance::with('employee')->get();
-        $pdf = \PDF::loadView('admin.attendance_pdf', compact('data'));
-        return $pdf->download('attendance.pdf');
+        return redirect()->back()->with('success', 'Attendance marked!');
     }
 }

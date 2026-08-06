@@ -6,13 +6,14 @@ use Illuminate\Http\Request;
 use Aws\Rekognition\RekognitionClient;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB; 
+use Carbon\Carbon; // <-- CRITICAL: Required for the 2-hour break math
 
 class FaceController extends Controller
 {
     public function scanFace(Request $request)
     {
         try {
-            // 1. Process the incoming image from the Kiosk
+            // 1. Process Kiosk Image
             $imageData = $request->input('image');
             if (!$imageData) {
                 return response()->json(['success' => false, 'message' => 'No camera image received.'], 400);
@@ -21,65 +22,120 @@ class FaceController extends Controller
             $image = str_replace(' ', '+', $image);
             $imageBytes = base64_decode($image);
 
-            // 2. Connect to AWS Rekognition (Mumbai Region)
+            // 2. Connect to AWS
             $rekognition = new RekognitionClient([
                 'region'    => env('AWS_DEFAULT_REGION', 'ap-south-1'),
                 'version'   => 'latest',
             ]);
 
-            // 3. Search the Collection for a Match
+            // 3. Search Faces
             $result = $rekognition->searchFacesByImage([
                 'CollectionId' => 'pragnaware-employee-faces', 
                 'Image' => ['Bytes' => $imageBytes],
                 'MaxFaces' => 1,
-                'FaceMatchThreshold' => 90, // Require a 90% confidence match
+                'FaceMatchThreshold' => 90, 
             ]);
 
-            // 4. Handle the Result (Toggle Logic)
+            // 4. Handle Logic
             if (!empty($result['FaceMatches'])) {
                 
-                // AWS returns the Employee ID we attached
                 $employeeId = $result['FaceMatches'][0]['Face']['ExternalImageId'];
-                $today = now()->toDateString();
-                $currentTime = now()->toTimeString();
+                $today = Carbon::today()->toDateString();
+                $currentTime = Carbon::now()->toTimeString();
 
-                // Look up the employee's most recent scan for today
+                // Find last record for today
                 $lastRecord = DB::table('attendances')
                     ->where('emp_id', $employeeId)
                     ->where('attendance_date', $today)
                     ->orderBy('id', 'desc')
                     ->first();
 
-                // Determine if this is a Check-In or Check-Out
-                // If there is no record today, OR the last record was a Check-Out (0)
                 if (!$lastRecord || $lastRecord->state == 0) {
-                    $newState = 1; // Check-In
+                    // ==========================================
+                    // ACTION: CHECK-IN (Returning to work)
+                    // ==========================================
+                    $newState = 1; 
                     $statusMessage = 'Face Verified! Check-IN successful for Employee ID: ' . $employeeId;
+                    
+                    // Create new attendance row
+                    DB::table('attendances')->insert([
+                        'emp_id' => $employeeId,
+                        'attendance_date' => $today,
+                        'attendance_time' => $currentTime,
+                        'status' => 1, 
+                        'state' => $newState, 
+                        'type' => 0,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+
+                    // --- MNC BREAK LOGIC: CLOSING THE BREAK ---
+                    // If they had a checkout earlier, calculate the gap
+                    if ($lastRecord && $lastRecord->state == 0) {
+                        $openBreak = DB::table('break_logs')
+                            ->where('attendance_id', $lastRecord->id)
+                            ->whereNull('break_end')
+                            ->first();
+
+                        if ($openBreak) {
+                            $breakStart = Carbon::parse($openBreak->break_start);
+                            $breakEnd = Carbon::now();
+                            $durationMinutes = $breakStart->diffInMinutes($breakEnd);
+
+                            // MNC Rule: Only count as a break if it's less than or equal to 2 hours (120 mins)
+                            if ($durationMinutes <= 120) {
+                                DB::table('break_logs')
+                                    ->where('id', $openBreak->id)
+                                    ->update([
+                                        'break_end' => $breakEnd->toDateTimeString(),
+                                        'updated_at' => now()
+                                    ]);
+                            } else {
+                                // If it's over 2 hours, they likely went home for the day. Delete the false break.
+                                DB::table('break_logs')->where('id', $openBreak->id)->delete();
+                            }
+                        }
+                    }
+
                 } else {
-                    $newState = 0; // Check-Out
+                    // ==========================================
+                    // ACTION: CHECK-OUT (Leaving for break or home)
+                    // ==========================================
+                    $newState = 0; 
                     $statusMessage = 'Face Verified! Check-OUT successful for Employee ID: ' . $employeeId;
+                    
+                    // Stamp the checkout time
+                    DB::table('attendances')
+                        ->where('id', $lastRecord->id)
+                        ->update([
+                            'check_out_time' => $currentTime,
+                            'state' => $newState,
+                            'updated_at' => now()
+                        ]);
+
+                    // --- MNC BREAK LOGIC: STARTING THE BREAK ---
+                    // If they check out before 4:00 PM, we assume they are going on break. 
+                    // This lights up the yellow "Currently on Break" card on the dashboard!
+                    $currentHour = Carbon::now()->hour;
+                    if ($currentHour < 16) { 
+                        DB::table('break_logs')->insert([
+                            'attendance_id' => $lastRecord->id,
+                            'emp_id' => $employeeId, // <-- THE FIX IS RIGHT HERE!
+                            'break_start' => Carbon::now()->toDateTimeString(),
+                            'break_end' => null,
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ]);
+                    }
                 }
-                
-                // Log the calculated status to the database
-                DB::table('attendances')->insert([
-                    'emp_id' => $employeeId,
-                    'attendance_date' => $today,
-                    'attendance_time' => $currentTime,
-                    'status' => 1, 
-                    'state' => $newState, 
-                    'type' => 0,
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
                 
                 return response()->json([
                     'success' => true,
                     'message' => $statusMessage,
-                    'state' => $newState // Sending the state back to the frontend
+                    'state' => $newState 
                 ]);
 
             } else {
-                // This gracefully handles BOTH incorrect faces and pitch-black/empty images
                 return response()->json([
                     'success' => false,
                     'message' => 'No face detected or recognized. Please ensure you are well-lit and looking at the camera.'

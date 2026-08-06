@@ -63,8 +63,8 @@
                                         <tr>
                                             <td> {{ $schedule->id }} </td>
                                             <td> {{ $schedule->slug }} </td>
-                                            <td> {{ $schedule->time_in }} </td>
-                                            <td> {{ $schedule->time_out }} </td>
+                                            <td>{{ date('H:i', strtotime($schedule->time_in)) }}</td>
+<td>{{ date('H:i', strtotime($schedule->time_out)) }}</td>
                                             <td>
 
                                                 <a href="#edit{{ $schedule->slug }}" data-toggle="modal"
