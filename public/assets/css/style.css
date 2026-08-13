@@ -3859,4 +3859,43 @@ Invoice
 .modal-content {
   text-align: center;
 }
-/*# sourceMappingURL=style.css.map */
+/* Sidebar Hover - Permanent Fix */
+#sidebar-menu > ul > li:hover > a,
+#sidebar-menu > ul > li > a:hover,
+#sidebar-menu > ul > li.mm-active > a,
+body.enlarged #wrapper .left.side-menu #sidebar-menu ul li:hover > a,
+body.enlarged #wrapper .left.side-menu #sidebar-menu ul li:hover > ul {
+    background-color: #ffffff !important;
+    color: #5867dd !important; /* Theme Blue */
+}
+
+/* Submenu background inside sidebar */
+#sidebar-menu > ul > li > ul {
+    background-color: #ffffff !important;
+}
+
+/* Remove black background completely */
+.left.side-menu #sidebar-menu ul li a:hover {
+    background-color: transparent !important;
+    color: #5867dd !important;
+}
+/* =========================================================
+   FIX: Remove Black Background on Collapsed Sidebar Hover 
+   ========================================================= */
+#sidebar-menu > ul > li:hover > a,
+#sidebar-menu > ul > li > a:hover,
+#sidebar-menu > ul > li.mm-active > a,
+body.enlarged #wrapper .left.side-menu #sidebar-menu ul li:hover > a,
+body.enlarged #wrapper .left.side-menu #sidebar-menu ul li:hover > ul {
+    background-color: #ffffff !important;
+    color: #5867dd !important; 
+}
+
+#sidebar-menu > ul > li > ul {
+    background-color: #ffffff !important;
+}
+
+.left.side-menu #sidebar-menu ul li a:hover {
+    background-color: transparent !important;
+    color: #5867dd !important;
+}

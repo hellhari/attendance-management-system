@@ -3,75 +3,99 @@
 namespace App\Http\Controllers;
 
 use App\Models\Schedule;
-use App\Http\Requests\ScheduleEmp;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Carbon\Carbon; // ✅ Imported Carbon for chronological math
+use Carbon\Carbon;
 
 class ScheduleController extends Controller
 {
     public function index()
     {
+        // AUTOMATIC SEEDING: டேட்டாபேஸ் காலியாக இருந்தால் தானாகவே 3 ஷிப்ட்களை உருவாக்கும்
+        if (Schedule::count() === 0) {
+            Schedule::create([
+                'slug' => 'morning-shift',
+                'time_in' => '09:00',
+                'time_out' => '18:00'
+            ]);
+            Schedule::create([
+                'slug' => 'mid-shift',
+                'time_in' => '13:00',
+                'time_out' => '22:00'
+            ]);
+            Schedule::create([
+                'slug' => 'night-shift',
+                'time_in' => '22:00',
+                'time_out' => '07:00'
+            ]);
+        }
+
         return view('admin.schedule')
             ->with('schedules', Schedule::all());
     }
 
-    public function store(ScheduleEmp $request)
+    public function store(Request $request)
     {
-        $request->validated();
+        $request->validate([
+            'slug' => 'required|string',
+            'start_time' => 'required',
+            'end_time' => 'required',
+        ]);
 
         $schedule = new Schedule();
-        $schedule->slug = Str::slug($request->slug);
+        $schedule->slug = $request->slug;
 
-        // ✅ OVERNIGHT SHIFT MATH (+1 Day Logic)
-        $time_in = Carbon::parse($request->time_in);
-        $time_out = Carbon::parse($request->time_out);
+        $time_in = Carbon::parse($request->start_time);
+        $time_out = Carbon::parse($request->end_time);
 
-        // If checkout time is earlier than check-in time, it crosses midnight
         if ($time_out->lessThan($time_in)) {
             $time_out->addDay(); 
         }
 
-        // Carbon automatically sanitizes the format to 'HH:MM:SS' for the database
         $schedule->time_in = $time_in->format('H:i');
         $schedule->time_out = $time_out->format('H:i');
         
         $schedule->save();
 
-        flash()->success('Success', 'Schedule has been created successfully !');
-
         return redirect()->route('schedule.index');
     }
 
-    public function update(ScheduleEmp $request, Schedule $schedule)
+    public function update(Request $request, $id)
     {
-        $request->validated();
+        $request->validate([
+            'slug' => 'required|string',
+            'start_time' => 'required',
+            'end_time' => 'required',
+        ]);
 
-        $schedule->slug = Str::slug($request->slug);
+        $schedule = Schedule::find($id);
+        if (!$schedule) {
+            $schedule = new Schedule();
+        }
 
-        // ✅ APPLY THE SAME OVERNIGHT MATH FOR UPDATES
-        $time_in = Carbon::parse($request->time_in);
-        $time_out = Carbon::parse($request->time_out);
+        $schedule->slug = $request->slug;
+
+        $time_in = Carbon::parse($request->start_time);
+        $time_out = Carbon::parse($request->end_time);
 
         if ($time_out->lessThan($time_in)) {
             $time_out->addDay(); 
         }
 
-        // This permanently removes the need for your old "str_split" hack
-        $schedule->time_in = $time_in->toTimeString();
-        $schedule->time_out = $time_out->toTimeString();
+        $schedule->time_in = $time_in->format('H:i');
+        $schedule->time_out = $time_out->format('H:i');
         
         $schedule->save();
-
-        flash()->success('Success', 'Schedule has been updated successfully !');
 
         return redirect()->route('schedule.index');
     }
 
-    public function destroy(Schedule $schedule)
+    public function destroy($id)
     {
-        $schedule->delete();
-
-        flash()->success('Success', 'Schedule has been deleted successfully !');
+        $schedule = Schedule::find($id);
+        if ($schedule) {
+            $schedule->delete();
+        }
 
         return redirect()->route('schedule.index');
     }

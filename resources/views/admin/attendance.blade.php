@@ -1,161 +1,151 @@
 @extends('layouts.master')
 
 @section('content')
-<div class="card">
-    <div class="card-body">
-        <h4 class="mt-0 header-title mb-4">Daily Attendance Overview</h4>
-        
-        <div class="table-responsive">
-            <table class="table table-hover table-bordered table-sm text-center align-middle">
-                <thead class="thead-light">
-                    <tr>
-                        <th class="text-left">Employee ID</th>
-                        <th>Time In</th>
-                        <th>Time Out</th>
-                        <th>Status</th>
-                        <th>Total Break Time</th>
-                        <th>Net Work Hours</th>
-                        <th>Overtime</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($attendances as $attendance)
-                        @php
-                            // --- THE DYNAMIC MATH ---
-                            $cleanDate = \Carbon\Carbon::parse($attendance->attendance_date)->format('Y-m-d');
-                            $timeIn = \Carbon\Carbon::parse($cleanDate . ' ' . $attendance->attendance_time);
-                            
-                            // 1. Calculate Gross Minutes with 16-Hour Safety Cap
-                            if ($attendance->check_out_time) {
-                                $timeOut = \Carbon\Carbon::parse($cleanDate . ' ' . $attendance->check_out_time);
-                                $grossMinutes = $timeIn->diffInMinutes($timeOut);
-                                $statusBadge = 'Completed';
-                            } else {
-                                $timeOut = null;
-                                $grossMinutes = $timeIn->diffInMinutes(now());
-                                
-                                // HR Safety Cap: Stop counting at 16 hours (960 minutes)
-                                if ($grossMinutes > 960) {
-                                    $grossMinutes = 960; 
-                                    $statusBadge = 'Missed Checkout';
-                                } else {
-                                    $statusBadge = 'Active';
-                                }
-                            }
-                            
-                            // 2. Calculate Break Time from Timestamps
-                            $breakLogs = \App\Models\BreakLog::where('attendance_id', $attendance->id)->get();
-                            $totalBreakMinutes = 0;
-                            foreach($breakLogs as $bLog) {
-                                if ($bLog->break_end) {
-                                    $bStart = \Carbon\Carbon::parse($bLog->break_start);
-                                    $bEnd = \Carbon\Carbon::parse($bLog->break_end);
-                                    $totalBreakMinutes += $bStart->diffInMinutes($bEnd);
-                                }
-                            }
-                            
-                            // 3. Net Hours & Overtime
-                            $netWorkingMinutes = $grossMinutes - $totalBreakMinutes;
-                            if ($netWorkingMinutes < 0) $netWorkingMinutes = 0;
-                            
-                            $netHours = floor($netWorkingMinutes / 60);
-                            $netMins = $netWorkingMinutes % 60;
-                            
-                            $standardShift = 480; // 8 hours
-                            $overtimeMinutes = $netWorkingMinutes > $standardShift ? $netWorkingMinutes - $standardShift : 0;
-                            $otHours = floor($overtimeMinutes / 60);
-                            $otMins = $overtimeMinutes % 60;
-                        @endphp
-                        
-                        <tr>
-                            <td class="text-left font-weight-bold">{{ $attendance->emp_id }}</td>
-                            <td>{{ $timeIn->format('h:i A') }}</td>
-                            <td>{{ $timeOut ? $timeOut->format('h:i A') : 'Still Working' }}</td>
-                            <td>
-                                @if($statusBadge == 'Completed')
-                                    <span class="badge bg-primary">Completed</span>
-                                @elseif($statusBadge == 'Missed Checkout')
-                                    <span class="badge bg-danger">Missed Checkout</span>
-                                @else
-                                    <span class="badge bg-warning">Active</span>
-                                @endif
-                            </td>
-                            
-                            <td class="align-middle text-center">
-                                <span class="{{ $totalBreakMinutes > 60 ? 'text-danger fw-bold' : 'text-success fw-bold' }}">
-                                    {{ $totalBreakMinutes }} mins
-                                </span>
-                                <br>
-                                @if($totalBreakMinutes > 0)
-                                    <button class="btn btn-sm btn-outline-secondary mt-1" data-toggle="modal" data-target="#breakModal{{ $attendance->id }}">
-                                        View Details
-                                    </button>
-                                @endif
-                            </td>
 
-                            <td class="align-middle fw-bold text-primary">
-                                {{ $netHours }}h {{ $netMins }}m
-                            </td>
+<style>
+    .profile-card { background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); padding: 24px; text-align: center; border-top: 4px solid #5867dd; }
+    .profile-avatar { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #e2e8f0; margin-bottom: 15px; }
+    .attendance-badge { font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 20px; background: #d1fae5; color: #059669; display: inline-block; margin-top: 10px; }
+    .month-accordion .card { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; box-shadow: none; }
+    .month-accordion .card-header { background-color: #f8fafc; padding: 15px 20px; cursor: pointer; border-bottom: none; border-radius: 8px; }
+    .month-accordion .card-header h5 { margin: 0; font-size: 16px; color: #1e293b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+    .month-accordion .card-header h5 i { color: #5867dd; transition: transform 0.3s; }
+    .month-accordion .card-header.collapsed h5 i { transform: rotate(-90deg); }
+    .ot-card { background: #fff; border-radius: 12px; padding: 20px; margin-top: 20px; border: 1px dashed #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .not-found-card { background: #fff; border-radius: 12px; padding: 60px 20px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #fee2e2; }
+    .not-found-icon { font-size: 70px; color: #f43f5e; margin-bottom: 20px; display: inline-block; }
+</style>
 
-                            <td class="align-middle">
-                                @if($overtimeMinutes > 0)
-                                    <span class="badge bg-success">+{{ $otHours }}h {{ $otMins }}m</span>
-                                @else
-                                    <span class="text-muted">-</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-@foreach($attendances as $attendance)
-    @php
-        $modalBreakLogs = \App\Models\BreakLog::where('attendance_id', $attendance->id)->get();
-    @endphp
+<div class="row mt-4">
     
-    @if($modalBreakLogs->count() > 0)
-        <div class="modal fade" id="breakModal{{ $attendance->id }}" tabindex="-1" role="dialog" aria-hidden="true">
-            <div class="modal-dialog" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Break Audit Trail</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <table class="table table-bordered table-sm text-center">
-                            <thead class="bg-light">
-                                <tr>
-                                    <th>Left Workspace</th>
-                                    <th>Returned</th>
-                                    <th>Duration</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($modalBreakLogs as $break)
-                                <tr>
-                                    <td>{{ \Carbon\Carbon::parse($break->break_start)->format('h:i A') }}</td>
-                                    <td>{{ $break->break_end ? \Carbon\Carbon::parse($break->break_end)->format('h:i A') : 'Still Outside' }}</td>
-                                    <td class="text-danger fw-bold">
-                                        {{ $break->break_end ? \Carbon\Carbon::parse($break->break_start)->diffInMinutes(\Carbon\Carbon::parse($break->break_end)) : '...' }} mins
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+    <!-- Full Logs Search Bar -->
+    <div class="col-12 mb-4">
+        <form action="{{ route('attendance.logs') }}" method="GET" class="input-group shadow-sm" style="max-width: 500px; margin: 0 auto;">
+            <input type="text" name="employee_query" class="form-control border-primary" placeholder="Search Employee ID or Name..." value="{{ request('employee_query') }}" required>
+            <div class="input-group-append">
+                <button class="btn btn-primary px-4" type="submit"><i class="ti-search"></i> Search</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- LOGIC: IF SEARCH QUERY IS ENTERED BUT NO EMPLOYEE FOUND IN DB -->
+    @if(request('employee_query') && !isset($employee))
+        <div class="col-12">
+            <div class="not-found-card mx-auto" style="max-width: 600px;">
+                <i class="ti-face-sad not-found-icon"></i>
+                <h3 class="text-dark font-weight-bold">Sorry, Result Not Found!</h3>
+                <p class="text-muted mt-2" style="font-size: 15px;">
+                    We couldn't find any employee matching <b>"{{ request('employee_query') }}"</b> in the database.<br>
+                    Please check the spelling or enter a valid Employee ID.
+                </p>
+                <a href="/check" class="btn btn-outline-primary mt-4 px-4 font-weight-bold"><i class="ti-arrow-left mr-2"></i>Back to Daily Sheet</a>
+            </div>
+        </div>
+
+    <!-- LOGIC: IF EMPLOYEE IS FOUND IN DB -->
+    @elseif(isset($employee))
+        <!-- Left Side: Dynamic Employee Profile from DB -->
+        <div class="col-lg-4 col-md-5">
+            <div class="profile-card">
+                <!-- Using Database Image or Fallback -->
+                <img src="{{ $employee->image_path ? asset($employee->image_path) : 'https://ui-avatars.com/api/?name='.urlencode($employee->name).'&background=5867dd&color=fff&size=128' }}" alt="Profile" class="profile-avatar">
+                <h4 class="mb-1 text-dark font-weight-bold">{{ $employee->name }}</h4>
+                <p class="text-muted mb-2">{{ $employee->position }} | ID: #{{ $employee->id }}</p>
+                
+                <div class="mt-3 border-top pt-3">
+                    <p class="text-muted text-sm mb-1">Overall Attendance (This Year)</p>
+                    <div class="attendance-badge">
+                        <i class="ti-stats-up mr-1"></i> {{ $attendancePercentage ?? '0' }}% Present
                     </div>
                 </div>
+
+                <!-- Contact Details from DB -->
+                <div class="mt-4 text-left">
+                    <p class="mb-2"><i class="ti-email text-primary mr-2"></i> {{ $employee->email ?? 'N/A' }}</p>
+                    <p class="mb-2"><i class="ti-mobile text-primary mr-2"></i> {{ $employee->mobile ?? 'N/A' }}</p>
+                </div>
+            </div>
+
+            <!-- Overtime Redirect Card -->
+            <div class="ot-card shadow-sm">
+                <div>
+                    <h5 class="text-dark font-weight-bold mb-1"><i class="ti-time text-warning mr-1"></i> Over Time Data</h5>
+                    <p class="text-muted text-sm mb-0">Extra hours worked.</p>
+                </div>
+                <a href="/overtime?employee_id={{ $employee->id }}" class="btn btn-warning font-weight-bold shadow-sm">View OT</a>
+            </div>
+        </div>
+
+        <!-- Right Side: Monthly Logs Dropdown (Accordion) fetched from DB -->
+        <div class="col-lg-8 col-md-7">
+            <div class="accordion month-accordion" id="attendanceAccordion">
+                
+                <!-- Controller should pass grouped logs (e.g., $monthlyLogs) -->
+                @if(isset($monthlyLogs) && count($monthlyLogs) > 0)
+                    @foreach($monthlyLogs as $month => $logs)
+                        <div class="card">
+                            <div class="card-header {{ $loop->first ? '' : 'collapsed' }}" id="heading{{ $loop->index }}" data-toggle="collapse" data-target="#collapse{{ $loop->index }}" aria-expanded="{{ $loop->first ? 'true' : 'false' }}">
+                                <h5>{{ $month }} <i class="ti-angle-down"></i></h5>
+                            </div>
+                            <div id="collapse{{ $loop->index }}" class="collapse {{ $loop->first ? 'show' : '' }}" data-parent="#attendanceAccordion">
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover mb-0">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Time In</th>
+                                                    <th>Time Out</th>
+                                                    <th>Net Hours</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($logs as $log)
+                                                    <tr>
+                                                        <td class="font-weight-bold">{{ \Carbon\Carbon::parse($log->date)->format('d M, D') }}</td>
+                                                        <td>{{ $log->time_in ? \Carbon\Carbon::parse($log->time_in)->format('h:i A') : '-' }}</td>
+                                                        <td>{{ $log->time_out ? \Carbon\Carbon::parse($log->time_out)->format('h:i A') : '-' }}</td>
+                                                        <td class="font-weight-bold {{ $log->net_hours == '0h 0m' ? 'text-danger' : 'text-primary' }}">{{ $log->net_hours ?? '0h 0m' }}</td>
+                                                        <td>
+                                                            @if($log->status == 'Present')
+                                                                <span class="badge badge-success px-2 py-1">Present</span>
+                                                            @elseif($log->status == 'In Progress')
+                                                                <span class="badge badge-warning px-2 py-1 text-dark">In Progress</span>
+                                                            @else
+                                                                <span class="badge badge-danger px-2 py-1">Absent</span>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                @else
+                    <div class="text-center py-5 text-muted">
+                        No attendance records found for this employee.
+                    </div>
+                @endif
+
+            </div>
+        </div>
+        
+    <!-- LOGIC: DEFAULT STATE (When page is opened directly without search) -->
+    @else
+        <div class="col-12">
+            <div class="not-found-card mx-auto" style="max-width: 600px; border-color: #e2e8f0;">
+                <i class="ti-search text-primary" style="font-size: 60px; margin-bottom: 20px; display: inline-block;"></i>
+                <h3 class="text-dark font-weight-bold">Search for an Employee</h3>
+                <p class="text-muted mt-2" style="font-size: 15px;">
+                    Enter an Employee Name or ID in the search box above to view their full attendance logs and reports.
+                </p>
             </div>
         </div>
     @endif
-@endforeach
 
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
-
+</div>
 @endsection

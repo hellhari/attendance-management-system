@@ -5,21 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Attendance Kiosk</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
-<body class="bg-gray-100 h-screen flex flex-col items-center justify-center">
+<body class="bg-gray-50 h-screen flex flex-col items-center justify-center">
 
-    <div class="bg-white p-8 rounded-lg shadow-xl text-center max-w-lg w-full">
+    <div class="bg-white p-8 rounded-xl shadow-lg text-center max-w-lg w-full">
         <h1 class="text-3xl font-bold mb-2 text-gray-800">Daily Kiosk</h1>
-        <p class="text-gray-500 mb-6">Please look at the camera to Check In or Check Out.</p>
+        <p class="text-gray-500 mb-6 text-sm">Please look at the camera to Check In or Check Out.</p>
 
-        <div class="relative w-full h-64 bg-black rounded-lg overflow-hidden mb-6 border-4 border-gray-200">
+        <!-- Camera Wrapper -->
+        <div class="relative w-full h-[280px] bg-black rounded-lg overflow-hidden mb-6 border border-gray-300">
             <video id="video" class="w-full h-full object-cover" autoplay playsinline></video>
+            
+            <!-- Status Overlay -->
+            <div id="status-overlay" class="hidden absolute bottom-0 left-0 w-full bg-black/80 p-3 flex flex-col items-center justify-center">
+                <p id="status-text" class="text-white font-bold text-[13px] mb-1.5"></p>
+                <p id="office-status" class="text-xs font-semibold flex items-center"></p>
+            </div>
         </div>
 
-        <div id="status-message" class="hidden p-4 mb-4 rounded font-semibold text-lg"></div>
-
-        <button id="scan-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg w-full transition duration-300">
+        <button id="scan-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-lg w-full transition duration-300">
             Scan Face
         </button>
     </div>
@@ -27,76 +33,108 @@
     <script>
         const video = document.getElementById('video');
         const scanBtn = document.getElementById('scan-btn');
-        const statusMsg = document.getElementById('status-message');
+        const statusOverlay = document.getElementById('status-overlay');
+        const statusText = document.getElementById('status-text');
+        const officeStatus = document.getElementById('office-status');
 
-        // 1. Turn on the Webcam
+        let currentLat = null;
+        let currentLng = null;
+        let currentAddress = "Location fetched";
+        let isInsideOffice = false;
+
+        const officeLat = 12.9715987; 
+        const officeLng = 77.5945627;
+        const allowedRadius = 200; 
+
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; 
+            const p1 = lat1 * Math.PI/180;
+            const p2 = lat2 * Math.PI/180;
+            const dp = (lat2-lat1) * Math.PI/180;
+            const dl = (lon2-lon1) * Math.PI/180;
+            const a = Math.sin(dp/2) * Math.sin(dp/2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl/2) * Math.sin(dl/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(async (position) => {
+                currentLat = position.coords.latitude;
+                currentLng = position.coords.longitude;
+                
+                const distance = getDistance(currentLat, currentLng, officeLat, officeLng);
+                isInsideOffice = distance <= allowedRadius;
+
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLat}&lon=${currentLng}`);
+                    const data = await res.json();
+                    currentAddress = data.display_name;
+                } catch(e) {}
+            }, (error) => {
+                console.log("Location access denied.");
+            });
+        }
+
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => { video.srcObject = stream; })
-            .catch(err => {
-                statusMsg.textContent = "Camera access denied. Please allow camera permissions.";
-                statusMsg.className = "p-4 mb-4 rounded font-semibold text-lg bg-red-100 text-red-700";
-                statusMsg.classList.remove('hidden');
-            });
+            .catch(err => { console.log("Camera error"); });
 
-        // 2. Capture Image & Send to AWS/Controller
         scanBtn.addEventListener('click', async () => {
-            // Disable button while processing
             scanBtn.disabled = true;
-            scanBtn.textContent = "Matching Face...";
-            scanBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            statusMsg.classList.add('hidden');
+            scanBtn.textContent = 'Matching...';
+            scanBtn.classList.add('opacity-70', 'cursor-not-allowed');
+            statusOverlay.classList.add('hidden');
 
-            // Take a snapshot from the video feed
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
-            const imageData = canvas.toDataURL('image/jpeg'); // Convert to Base64 String
+            const imageData = canvas.toDataURL('image/jpeg'); 
 
             try {
-                // Send the image to our new Route (/scan-face)
                 const response = await fetch('/scan-face', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify({ image: imageData })
+                    body: JSON.stringify({ 
+                        image: imageData,
+                        latitude: currentLat,
+                        longitude: currentLng,
+                        address: currentAddress
+                    })
                 });
 
                 const result = await response.json();
-
-                // Display the Success/Error Message from FaceController.php
-                statusMsg.classList.remove('hidden');
+                statusOverlay.classList.remove('hidden');
                 
                 if (result.success) {
-                    statusMsg.textContent = result.message; 
+                    statusText.textContent = `Face Verified! Check-IN successful for Employee ID: ${result.emp_id || '112'}`;
                     
-                    // Toggle the colors based on the state!
-                    if (result.state === 1) {
-                        // CHECK-IN: Make it Green
-                        statusMsg.className = "p-4 mb-4 rounded font-semibold text-lg bg-green-100 text-green-800 border border-green-300";
+                    if (isInsideOffice) {
+                        officeStatus.className = "text-green-400 text-xs font-semibold flex items-center tracking-wide";
+                        officeStatus.innerHTML = '<i class="fa-solid fa-location-dot mr-1.5"></i> Inside Office';
                     } else {
-                        // CHECK-OUT: Make it Blue
-                        statusMsg.className = "p-4 mb-4 rounded font-semibold text-lg bg-blue-100 text-blue-800 border border-blue-300";
+                        officeStatus.className = "text-rose-400 text-xs font-semibold flex items-center tracking-wide";
+                        officeStatus.innerHTML = '<i class="fa-solid fa-location-dot mr-1.5"></i> Outside Office';
                     }
                 } else {
-                    // ERROR / NO FACE MATCH: Make it Red
-                    statusMsg.textContent = result.message || "Face not recognized.";
-                    statusMsg.className = "p-4 mb-4 rounded font-semibold text-lg bg-red-100 text-red-800 border border-red-300";
+                    statusText.textContent = result.message || "Face not recognized.";
+                    officeStatus.innerHTML = "";
                 }
             } catch (error) {
-                statusMsg.classList.remove('hidden');
-                statusMsg.textContent = "Network error. Please try again.";
-                statusMsg.className = "p-4 mb-4 rounded font-semibold text-lg bg-red-100 text-red-800 border border-red-300";
+                statusOverlay.classList.remove('hidden');
+                statusText.textContent = 'Network error. Please try again.';
+                officeStatus.innerHTML = "";
             }
 
-            // Reset the button after 3 seconds so the next person can scan
             setTimeout(() => {
                 scanBtn.disabled = false;
-                scanBtn.textContent = "Scan Face";
-                scanBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            }, 3000);
+                scanBtn.textContent = 'Scan Face';
+                scanBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+                statusOverlay.classList.add('hidden');
+            }, 4000);
         });
     </script>
 </body>

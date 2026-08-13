@@ -31,7 +31,6 @@
                 color: var(--text-normal);
             }
             
-            /* Enforce White Sidebar and Topbar */
             .topbar .topbar-left,
             .left.side-menu,
             #sidebar-menu { 
@@ -40,7 +39,6 @@
                 border-right: 1px solid #e2e8f0 !important;
             }
             
-            /* Ensure Sidebar Links are Visible (Dark Grey) */
             #sidebar-menu > ul > li > a {
                 color: var(--text-normal) !important;
             }
@@ -48,7 +46,6 @@
                 color: var(--text-secondary) !important;
             }
             
-            /* Active Links */
             #sidebar-menu > ul > li > a.active {
                 color: var(--primary-blue) !important;
                 background-color: transparent !important;
@@ -57,13 +54,12 @@
                 color: var(--primary-blue) !important;
             }
             
-            /* Sidebar Section Titles */
             .menu-title {
                 color: var(--text-secondary) !important;
             }
         </style>
     </head>
-    <body>
+    <body data-sidebar="light"> 
         <div id="wrapper">
              @include('layouts.header')
              @include('layouts.sidebar')

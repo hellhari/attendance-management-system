@@ -90,19 +90,19 @@ Route::group(['middleware' => ['auth', 'Role'], 'roles' => ['admin']], function 
         ->name('visitor.store');
 
     Route::get('/visitor-logs', [VisitorController::class, 'index'])
-        ->name('admin.visitor_index'); // Matches the name used in your Index blade
+        ->name('admin.visitor_index'); 
 
     Route::post('/visitor/checkout/{id}', [VisitorController::class, 'checkout'])
         ->name('visitor.checkout');
 
     Route::get('/visitor-download', [VisitorController::class, 'downloadReport'])
-        ->name('visitor.export'); // Matches the download button in your Index blade
+        ->name('visitor.export'); 
 
     // LEAVE / OVERTIME
     Route::get('/leave', [LeaveController::class, 'index'])->name('leave');
     Route::get('/overtime', [LeaveController::class, 'indexOvertime'])->name('overtime');
 
-    // SCHEDULE
+    // SCHEDULE (Route::resource handles index, store, update, destroy automatically)
     Route::resource('/schedule', ScheduleController::class);
 
     // MANUAL CHECK
@@ -151,12 +151,10 @@ Route::group(['middleware' => ['auth', 'Role'], 'roles' => ['admin']], function 
 | DAILY BIOMETRIC KIOSK (ODD/EVEN CHECK-IN TOGGLE)
 |--------------------------------------------------------------------------
 */
-// 1. The UI Page (The Kiosk Camera)
 Route::get('/kiosk', function () {
     return view('admin.kiosk'); 
 })->name('kiosk.view');
 
-// 2. The Backend Logic (The AWS Face Match & DB Toggle)
 Route::post('/scan-face', [FaceController::class, 'scanFace'])->name('scan.face');
 
 /*
