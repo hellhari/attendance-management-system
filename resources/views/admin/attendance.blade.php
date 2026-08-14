@@ -20,7 +20,7 @@
     
     <!-- Full Logs Search Bar -->
     <div class="col-12 mb-4">
-        <form action="{{ route('attendance.logs') }}" method="GET" class="input-group shadow-sm" style="max-width: 500px; margin: 0 auto;">
+        <form action="/attendance" method="GET" class="input-group shadow-sm" style="max-width: 500px; margin: 0 auto;">
             <input type="text" name="employee_query" class="form-control border-primary" placeholder="Search Employee ID or Name..." value="{{ request('employee_query') }}" required>
             <div class="input-group-append">
                 <button class="btn btn-primary px-4" type="submit"><i class="ti-search"></i> Search</button>
@@ -112,6 +112,8 @@
                                                                 <span class="badge badge-success px-2 py-1">Present</span>
                                                             @elseif($log->status == 'In Progress')
                                                                 <span class="badge badge-warning px-2 py-1 text-dark">In Progress</span>
+                                                            @elseif($log->status == 'Break Time')
+                                                                <span class="badge px-2 py-1 text-white" style="background-color: #3b82f6;">Break Time</span>
                                                             @else
                                                                 <span class="badge badge-danger px-2 py-1">Absent</span>
                                                             @endif
