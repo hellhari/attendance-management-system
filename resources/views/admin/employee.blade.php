@@ -18,9 +18,8 @@
 <div class="col-sm-6">
     <h4 class="page-title text-left">Employees</h4>
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="javascript:void(0);">Home</a></li>
-        <li class="breadcrumb-item"><a href="javascript:void(0);">Employees</a></li>
-        <li class="breadcrumb-item"><a href="javascript:void(0);">Employees List</a></li>
+        <li class="breadcrumb-item"><a href="/" class="text-primary font-weight-bold">Home</a></li>
+        <li class="breadcrumb-item active text-dark">Employees</li>
     </ol>
 </div>
 @endsection
@@ -43,10 +42,10 @@
 @endif
 <div class="row">
     <div class="col-12">
-        <div class="card">
+        <div class="card shadow-sm border-0">
             <div class="card-body">
                 <table id="datatable-buttons" class="table table-striped table-bordered dt-responsive nowrap" style="border-collapse: collapse; border-spacing: 0; width: 100%;">
-                    <thead>
+                    <thead class="bg-light">
                         <tr>
                             <th data-priority="1">Employee ID</th>
                             <th data-priority="2">Name</th>
@@ -60,27 +59,27 @@
                     <tbody>
                         @foreach($employees as $employee)
                         <tr>
-                            <td>{{$employee->id}}</td>
-                            <td>{{$employee->name}}</td>
+                            <td class="font-weight-bold text-muted">#{{$employee->id}}</td>
+                            <td class="font-weight-bold text-dark">{{$employee->name}}</td>
                             <td>{{$employee->position}}</td>
                             <td>{{$employee->email}}</td>
                             <td>
                                 @if(isset($employee->schedules->first()->slug))
-                                    {{$employee->schedules->first()->slug}}
+                                    <span class="badge badge-soft-primary px-2 py-1">{{$employee->schedules->first()->slug}}</span>
                                 @endif
                             </td>
-                            <td>{{$employee->created_at}}</td>
+                            <td>{{ \Carbon\Carbon::parse($employee->created_at)->format('d M Y') }}</td>
                             <td>
-                                <a href="#edit{{$employee->id}}" data-toggle="modal" class="btn btn-success btn-sm">
+                                <a href="#edit{{$employee->id}}" data-toggle="modal" class="btn btn-success btn-sm shadow-sm mr-1">
                                     <i class='fa fa-edit'></i>
                                 </a>
 
-                                <a href="#delete{{$employee->id}}" data-toggle="modal" class="btn btn-danger btn-sm">
+                                <a href="#delete{{$employee->id}}" data-toggle="modal" class="btn btn-danger btn-sm shadow-sm mr-1">
                                     <i class='fa fa-trash'></i>
                                 </a>
 
-                                <a href="{{ route('employees.capture.view', $employee->id) }}" class="btn btn-info btn-sm">
-                                    📷 Face
+                                <a href="{{ route('employees.capture.view', $employee->id) }}" class="btn btn-info btn-sm shadow-sm">
+                                    <i class="ti-camera mr-1"></i> Face
                                 </a>
                             </td>
                         </tr>
@@ -89,7 +88,10 @@
                 </table>
             </div>
         </div>
-    </div> </div> @foreach($employees as $employee)
+    </div> 
+</div> 
+
+@foreach($employees as $employee)
     @include('includes.edit_delete_employee')
 @endforeach
 

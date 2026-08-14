@@ -14,9 +14,25 @@
     .ot-card { background: #fff; border-radius: 12px; padding: 20px; margin-top: 20px; border: 1px dashed #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
     .not-found-card { background: #fff; border-radius: 12px; padding: 60px 20px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #fee2e2; }
     .not-found-icon { font-size: 70px; color: #f43f5e; margin-bottom: 20px; display: inline-block; }
+    .page-title-box { padding-bottom: 15px; border-bottom: 1px solid #e2e8f0; margin-bottom: 25px; margin-top: 15px; }
+    .breadcrumb { background-color: transparent; padding: 0; margin-bottom: 0; }
 </style>
 
-<div class="row mt-4">
+<!-- PAGE HEADER & BREADCRUMB -->
+<div class="page-title-box d-flex align-items-center justify-content-between">
+    <h4 class="mb-0 font-weight-bold text-dark">
+        <i class="ti-view-list-alt text-primary mr-2"></i> Full Attendance Logs
+    </h4>
+    <div class="page-title-right">
+        <ol class="breadcrumb m-0 text-muted">
+            <li class="breadcrumb-item"><a href="/home" class="text-primary font-weight-bold">Home</a></li>
+            <li class="breadcrumb-item">Attendance Records</li>
+            <li class="breadcrumb-item active text-dark font-weight-bold">Full Logs</li>
+        </ol>
+    </div>
+</div>
+
+<div class="row mt-3">
     
     <!-- Full Logs Search Bar -->
     <div class="col-12 mb-4">

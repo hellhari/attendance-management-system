@@ -27,19 +27,19 @@
 
     /* Allow titles to wrap naturally so you see the FULL text */
     .pragnaware-stat-card h5, .pragnaware-stat-card h6 {
-        white-space: normal !important; /* Allows wrapping */
+        white-space: normal !important; 
         font-size: 13px !important; 
-        line-height: 1.4 !important; /* Keeps spacing clean on two lines */
-        min-height: 36px; /* Forces all titles to take up the same height so cards stay aligned */
+        line-height: 1.4 !important; 
+        min-height: 36px; 
     }
 
     /* Fix the 'More info' footer alignment and put the arrow on the right */
     .pragnaware-stat-card .pt-2 {
         display: flex;
-        justify-content: space-between; /* Pushes items to opposite sides */
+        justify-content: space-between; 
         align-items: center;
         width: 100%;
-        flex-direction: row-reverse; /* Flips the arrow back to the right side */
+        flex-direction: row-reverse; 
         padding-top: 15px !important;
         margin-top: 10px;
     }
@@ -53,15 +53,16 @@
 
 @section('breadcrumb')
 <div class="col-sm-6 text-left" >
-     <h4 class="page-title">Dashboard</h4>
+     <h4 class="page-title text-dark font-weight-bold">Dashboard</h4>
      <ol class="breadcrumb">
-         <li class="breadcrumb-item active">Welcome to Attendance Management System</li>
+         <li class="breadcrumb-item"><a href="/" class="text-primary font-weight-bold">Home</a></li>
+         <li class="breadcrumb-item active text-dark">Overview</li>
      </ol>
 </div>
 @endsection
 
 @section('content')
-<div class="row">
+<div class="row mt-3">
     <!-- METRIC 1: TOTAL PRESENT TODAY -->
     <div class="col-xl-3 col-md-6">
         <div class="card mini-stat pragnaware-stat-card" onclick="window.location.href='/attendance';" style="cursor: pointer;">
@@ -71,7 +72,6 @@
                         <span class="ti-id-badge" style="font-size: 20px"></span>
                     </div>
                     <h5 class="font-16 text-uppercase mt-0 text-muted">Total Present</h5>
-                    <!-- Connected to the HomeController variable -->
                     <h4 class="font-500 text-primary">{{ isset($totalPresent) ? $totalPresent : 0 }} </h4>
                 </div>
                 <div class="pt-2 border-top">
@@ -93,7 +93,6 @@
                         <i class="ti-alert" style="font-size: 20px; background: linear-gradient(135deg, #EF4444, #F97316); -webkit-background-clip: text;"></i>
                     </div>
                     <h5 class="font-16 text-uppercase mt-0 text-muted">Late Arrivals</h5>
-                    <!-- Connected to the HomeController variable -->
                     <h4 class="font-500 text-danger">{{ isset($lateArrivalsCount) ? $lateArrivalsCount : 0 }}</h4>
                 </div>
                 <div class="pt-2 border-top">
@@ -115,7 +114,6 @@
                         <i class="ti-alarm-clock" style="font-size: 20px; background: linear-gradient(135deg, #F59E0B, #EAB308); -webkit-background-clip: text;"></i>
                     </div>
                     <h5 class="font-16 text-uppercase mt-0 text-muted">Currently on Break</h5>
-                    <!-- Connected to the HomeController variable -->
                     <h4 class="font-500 text-warning">{{ isset($currentlyOnBreak) ? $currentlyOnBreak : 0 }}</h4>
                 </div>
                 <div class="pt-2 border-top">
@@ -137,7 +135,6 @@
                         <i class="ti-check-box" style="font-size: 20px"></i>
                     </div>
                     <h5 class="font-16 text-uppercase mt-0 text-muted">Avg. On-Time</h5>
-                    <!-- Connected to the HomeController variable -->
                     <h4 class="font-500 text-success">{{ isset($avgOnTime) ? $avgOnTime : 100 }}%</h4>
                 </div>
                 <div class="pt-2 border-top">
@@ -153,9 +150,9 @@
 
 <div class="row">
     <div class="col-xl-9">
-        <div class="card">
+        <div class="card border-0 shadow-sm">
             <div class="card-body">
-                <h4 class="mt-0 header-title mb-5">Monthly Report</h4>
+                <h4 class="mt-0 header-title mb-5 font-weight-bold">Monthly Report</h4>
                 <div class="row">
                     <div class="col-lg-7">
                         <div>
@@ -174,7 +171,7 @@
                             <div class="col-md-6">
                                 <div class="text-center">
                                     <p class="text-muted mb-4">Total Overtime Hrs</p>
-                                    <h4>0</h4> <!-- Placeholder for future Overtime Engine -->
+                                    <h4>0</h4>
                                     <span class="peity-donut" data-peity='{ "fill": ["#02a499", "#f2f2f2"], "innerRadius": 28, "radius": 32 }' data-width="72" data-height="72">0/100</span>
                                 </div>
                             </div>
@@ -186,10 +183,10 @@
     </div>
 
     <div class="col-xl-3">
-        <div class="card">
+        <div class="card border-0 shadow-sm">
             <div class="card-body">
                 <div>
-                    <h4 class="mt-0 header-title mb-4">Daily Overview</h4>
+                    <h4 class="mt-0 header-title mb-4 font-weight-bold">Daily Overview</h4>
                 </div>
                 <div class="wid-peity mb-4">
                     <div class="row">

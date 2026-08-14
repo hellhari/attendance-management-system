@@ -1,7 +1,18 @@
 @extends('layouts.master')
 
+@section('breadcrumb')
+<div class="col-sm-6 text-left">
+    <h4 class="page-title text-dark font-weight-bold">Daily Attendance Sheet</h4>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/" class="text-primary font-weight-bold">Home</a></li>
+        <li class="breadcrumb-item">Attendance Records</li>
+        <li class="breadcrumb-item active text-dark font-weight-bold">Daily Sheet</li>
+    </ol>
+</div>
+@endsection
+
 @section('content')
-<div class="card shadow-sm border-0 mt-4">
+<div class="card shadow-sm border-0 mt-2">
     <div class="card-body p-4">
         
         <!-- Header & Smart Search Box -->
@@ -9,8 +20,8 @@
             <!-- Dynamic Title -->
             <div class="col-md-6">
                 <h4 class="mt-0 header-title font-weight-bold text-dark mb-0">
-                    <i class="ti-calendar text-primary mr-2"></i> Daily Sheet: 
-                    <span class="text-muted font-weight-normal" style="font-size: 15px;">Today ({{ \Carbon\Carbon::now()->format('d M Y') }})</span>
+                    <i class="ti-calendar text-primary mr-2"></i> Today's Sheet: 
+                    <span class="text-muted font-weight-normal" style="font-size: 15px;">({{ \Carbon\Carbon::now()->format('d M Y') }})</span>
                 </h4>
             </div>
             
@@ -62,6 +73,8 @@
                                         <span class="badge badge-success px-3 py-1" style="font-size: 12px;">Present</span>
                                     @elseif($attendance->status == 'In Progress')
                                         <span class="badge badge-warning px-3 py-1 text-dark" style="font-size: 12px;">In Progress</span>
+                                    @elseif($attendance->status == 'On Break' || $attendance->status == 'Break Time')
+                                        <span class="badge px-3 py-1 text-white" style="background-color: #3b82f6; font-size: 12px;">On Break</span>
                                     @else
                                         <span class="badge badge-danger px-3 py-1" style="font-size: 12px;">Absent</span>
                                     @endif
