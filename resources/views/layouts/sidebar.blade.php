@@ -8,18 +8,38 @@
         color: #5867dd !important; 
     }
     
-    #sidebar-menu .submenu, .enlarged #sidebar-menu ul li:hover > ul, body.enlarged #sidebar-menu ul li:hover > ul, .left.side-menu .submenu, ul.submenu, .submenu.collapse.in {
+    /* FIX 1: OVERLAP & SHADOW (Z-INDEX) */
+    #sidebar-menu .submenu, 
+    .enlarged #sidebar-menu ul li:hover > ul, 
+    body.enlarged #sidebar-menu ul li:hover > ul, 
+    .left.side-menu .submenu, 
+    ul.submenu, 
+    .submenu.collapse.in {
         background-color: #ffffff !important; 
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.05) !important; 
+        box-shadow: 0px 8px 25px rgba(0,0,0,0.15) !important; /* Strong floating shadow */
         border: 1px solid #e2e8f0 !important;
+        z-index: 9999 !important; /* Brings menu strictly to the front */
+        border-radius: 8px;
     }
+    
+    body.enlarged #sidebar-menu ul li {
+        position: relative !important; 
+    }
+    
     .enlarged #sidebar-menu ul li:hover > a { 
         background-color: #ffffff !important; 
         color: #5867dd !important; 
     }
+    
+    /* Dropdown Item Hover Animation */
+    #sidebar-menu .submenu li a {
+        padding: 10px 20px !important;
+        transition: all 0.3s ease;
+    }
     #sidebar-menu .submenu li a:hover { 
         background-color: #f8f9fa !important; 
         color: #5867dd !important; 
+        padding-left: 25px !important; /* Nice slide-right effect on hover */
     }
 
     #sidebar-menu ul li a.active, #sidebar-menu ul li a.mm.active, .metismenu li.active > a, #sidebar-menu ul li.active > a {
@@ -30,13 +50,26 @@
         color: #4f46e5 !important;
     }
 
-    /* FIX: Hide the '>' Arrow until Hover */
+    /* FIX 2: THE ARROW INDICATOR */
     #sidebar-menu ul li a.has-arrow::after {
-        display: none !important;
+        content: "" !important;
+        display: inline-block !important;
+        float: right;
+        margin-top: 8px;
+        width: 7px;
+        height: 7px;
+        border-bottom: 2px solid #74788d;
+        border-right: 2px solid #74788d;
+        transform: rotate(-45deg); /* Right pointing arrow (>) */
+        transition: transform 0.3s ease;
     }
-    #sidebar-menu ul li:hover > a.has-arrow::after,
-    #sidebar-menu ul li.mm-active > a.has-arrow::after {
-        display: block !important;
+    
+    /* When Dropdown is Open */
+    #sidebar-menu ul li.mm-active > a.has-arrow::after,
+    #sidebar-menu ul li.active > a.has-arrow::after,
+    #sidebar-menu ul li > a[aria-expanded="true"].has-arrow::after {
+        transform: rotate(45deg) !important; /* Down pointing arrow (v) */
+        border-color: #4f46e5 !important;
     }
 </style>
 
@@ -69,19 +102,20 @@
                 
                 <!-- Attendance Records Dropdown -->
                 <li>
-                    <a href="javascript:void(0);" class="waves-effect has-arrow">
+                    <a href="javascript:void(0);" class="waves-effect has-arrow {{ request()->is('check', 'attendance', 'sheet-report', 'overtime') ? 'active' : '' }}">
                         <i class="ti-calendar"></i><span> Attendance Records </span>
                     </a>
                     <ul class="submenu">
                         <li><a href="/check" class="{{ request()->is('check') ? 'active' : '' }}">Daily Sheet</a></li>
                         <li><a href="/attendance" class="{{ request()->is('attendance') ? 'active' : '' }}">Full Logs</a></li>
+                        <li><a href="/sheet-report" class="{{ request()->is('sheet-report') ? 'active' : '' }}">Monthly Sheet</a></li>
                         <li><a href="/overtime" class="{{ request()->is('overtime') ? 'active' : '' }}">Over Time</a></li>
                     </ul>
                 </li>
 
                 <!-- Time Exceptions Dropdown -->
                 <li>
-                    <a href="javascript:void(0);" class="waves-effect has-arrow">
+                    <a href="javascript:void(0);" class="waves-effect has-arrow {{ request()->is('latetime') ? 'active' : '' }}">
                         <i class="dripicons-warning"></i><span> Time Exceptions </span>
                     </a>
                     <ul class="submenu">
@@ -91,11 +125,6 @@
 
                 <!-- 3. Reports & Payroll -->
                 <li class="menu-title">Reports & Payroll</li>
-                <li>
-                    <a href="/sheet-report" class="waves-effect {{ request()->is('sheet-report') ? 'mm active' : '' }}">
-                        <i class="dripicons-to-do"></i> <span> Attendance Report </span>
-                    </a>
-                </li>
                 <li>
                     <a href="/pay-report" class="waves-effect {{ request()->is('pay-report') ? 'mm active' : '' }}">
                         <i class="ti-wallet"></i> <span> Pay Report </span>
@@ -112,7 +141,7 @@
                 
                 <!-- Visitor Management Dropdown -->
                 <li>
-                    <a href="javascript:void(0);" class="waves-effect has-arrow">
+                    <a href="javascript:void(0);" class="waves-effect has-arrow {{ request()->is('visitor-checkin', 'visitor-logs') ? 'active' : '' }}">
                         <i class="dripicons-user-group"></i><span> Visitor Management </span>
                     </a>
                     <ul class="submenu">
@@ -129,7 +158,7 @@
                     </a>
                 </li>
 
-            </ul>         
+            </ul>        
         </div>
         <div class="clearfix"></div>
     </div>
