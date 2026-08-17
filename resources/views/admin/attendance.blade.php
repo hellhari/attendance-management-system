@@ -1,169 +1,183 @@
 @extends('layouts.master')
 
+@section('breadcrumb')
+<div class="col-sm-6 text-left">
+    <h4 class="page-title text-dark font-weight-bold">Employee Profile & Calendar</h4>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/admin" class="text-primary font-weight-bold">Home</a></li>
+        <li class="breadcrumb-item"><a href="/sheet-report" class="text-primary font-weight-bold">Master Attendance</a></li>
+        <li class="breadcrumb-item active text-dark font-weight-bold">Calendar View</li>
+    </ol>
+</div>
+@endsection
+
 @section('content')
 
 <style>
-    .profile-card { background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); padding: 24px; text-align: center; border-top: 4px solid #5867dd; }
-    .profile-avatar { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #e2e8f0; margin-bottom: 15px; }
-    .attendance-badge { font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 20px; background: #d1fae5; color: #059669; display: inline-block; margin-top: 10px; }
-    .month-accordion .card { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 15px; box-shadow: none; }
-    .month-accordion .card-header { background-color: #f8fafc; padding: 15px 20px; cursor: pointer; border-bottom: none; border-radius: 8px; }
-    .month-accordion .card-header h5 { margin: 0; font-size: 16px; color: #1e293b; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-    .month-accordion .card-header h5 i { color: #5867dd; transition: transform 0.3s; }
-    .month-accordion .card-header.collapsed h5 i { transform: rotate(-90deg); }
-    .ot-card { background: #fff; border-radius: 12px; padding: 20px; margin-top: 20px; border: 1px dashed #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-    .not-found-card { background: #fff; border-radius: 12px; padding: 60px 20px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #fee2e2; }
-    .not-found-icon { font-size: 70px; color: #f43f5e; margin-bottom: 20px; display: inline-block; }
-    .page-title-box { padding-bottom: 15px; border-bottom: 1px solid #e2e8f0; margin-bottom: 25px; margin-top: 15px; }
-    .breadcrumb { background-color: transparent; padding: 0; margin-bottom: 0; }
-</style>
+    .profile-card { background: #fff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); padding: 30px; text-align: center; border: none; }
+    .profile-avatar { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #e0e7ff; margin-bottom: 15px; }
+    .attendance-badge { font-size: 15px; font-weight: 700; padding: 10px 20px; border-radius: 30px; background: #d1fae5; color: #059669; display: inline-block; margin-top: 15px; }
+    .ot-card { background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 16px; padding: 25px; margin-top: 20px; color: white; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+    
+    /* --- CLEAN CALENDAR GRID CSS --- */
+    .calendar-container { background: #fff; border-radius: 16px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+    .calendar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); gap: 15px; margin-top: 20px; }
+    
+    .day-card { 
+        background: #ffffff; 
+        border: 1px solid #e2e8f0; 
+        border-radius: 12px; 
+        padding: 15px 10px; 
+        text-align: center; 
+        transition: transform 0.2s, box-shadow 0.2s; 
+        color: #1e293b; 
+    }
+    .day-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.05); }
+    
+    .day-card .day-name { font-size: 12px; text-transform: uppercase; font-weight: 700; color: #64748b; margin-bottom: 5px; }
+    .day-card .date-num { font-size: 28px; font-weight: 800; line-height: 1; margin-bottom: 12px; color: #0f172a; }
+    .day-card .status-text { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 5px 10px; border-radius: 20px; display: inline-block; }
+    .day-card .hours-logged { font-size: 13px; font-weight: 600; margin-top: 12px; display: block; border-top: 1px solid #f1f5f9; padding-top: 10px; color: #475569; }
 
-<!-- PAGE HEADER & BREADCRUMB -->
-<div class="page-title-box d-flex align-items-center justify-content-between">
-    <h4 class="mb-0 font-weight-bold text-dark">
-        <i class="ti-view-list-alt text-primary mr-2"></i> Full Attendance Logs
-    </h4>
-    <div class="page-title-right">
-        <ol class="breadcrumb m-0 text-muted">
-            <li class="breadcrumb-item"><a href="/home" class="text-primary font-weight-bold">Home</a></li>
-            <li class="breadcrumb-item">Attendance Records</li>
-            <li class="breadcrumb-item active text-dark font-weight-bold">Full Logs</li>
-        </ol>
-    </div>
-</div>
+    /* PROFESSIONAL BADGE COLORS & TOP BORDER (UPDATED WITH NEW LOGIC) */
+    .status-completed { border-top: 4px solid #10b981; }
+    .status-completed .status-text { background: #d1fae5; color: #059669; }
+
+    .status-progress { border-top: 4px solid #f59e0b; }
+    .status-progress .status-text { background: #fef3c7; color: #d97706; }
+
+    .status-absent { border-top: 4px solid #ef4444; }
+    .status-absent .status-text { background: #fee2e2; color: #dc2626; }
+
+    .status-break { border-top: 4px solid #3b82f6; }
+    .status-break .status-text { background: #dbeafe; color: #2563eb; }
+
+    .status-holiday { border-top: 4px solid #94a3b8; }
+    .status-holiday .status-text { background: #f1f5f9; color: #475569; }
+
+    /* ACTION REQUIRED BADGE */
+    .action-badge {
+        background: #fff1f2; 
+        color: #e11d48; 
+        border: 1px dashed #fda4af; 
+        padding: 4px 10px; 
+        border-radius: 6px; 
+        font-size: 11px; 
+        font-weight: 700; 
+        letter-spacing: 0.3px;
+        display: inline-block;
+    }
+</style>
 
 <div class="row mt-3">
     
-    <!-- Full Logs Search Bar -->
-    <div class="col-12 mb-4">
-        <form action="/attendance" method="GET" class="input-group shadow-sm" style="max-width: 500px; margin: 0 auto;">
-            <input type="text" name="employee_query" class="form-control border-primary" placeholder="Search Employee ID or Name..." value="{{ request('employee_query') }}" required>
-            <div class="input-group-append">
-                <button class="btn btn-primary px-4" type="submit"><i class="ti-search"></i> Search</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- LOGIC: IF SEARCH QUERY IS ENTERED BUT NO EMPLOYEE FOUND IN DB -->
     @if(request('employee_query') && !isset($employee))
-        <div class="col-12">
-            <div class="not-found-card mx-auto" style="max-width: 600px;">
-                <i class="ti-face-sad not-found-icon"></i>
-                <h3 class="text-dark font-weight-bold">Sorry, Result Not Found!</h3>
-                <p class="text-muted mt-2" style="font-size: 15px;">
-                    We couldn't find any employee matching <b>"{{ request('employee_query') }}"</b> in the database.<br>
-                    Please check the spelling or enter a valid Employee ID.
-                </p>
-                <a href="/check" class="btn btn-outline-primary mt-4 px-4 font-weight-bold"><i class="ti-arrow-left mr-2"></i>Back to Daily Sheet</a>
-            </div>
+        <div class="col-12 text-center mt-5">
+            <h3 class="text-danger">Result Not Found!</h3>
+            <a href="/sheet-report" class="btn btn-primary mt-3">Back to Master Attendance</a>
         </div>
-
-    <!-- LOGIC: IF EMPLOYEE IS FOUND IN DB -->
+    @elseif(!isset($employee))
+        <div class="col-12 text-center mt-5">
+            <h3 class="text-muted">Search an employee or select from Master Attendance</h3>
+            <form action="/attendance" method="GET" class="mt-3">
+                <input type="text" name="employee_query" class="form-control d-inline w-25" placeholder="Employee ID...">
+                <button type="submit" class="btn btn-primary">Go</button>
+            </form>
+        </div>
+        
     @elseif(isset($employee))
-        <!-- Left Side: Dynamic Employee Profile from DB -->
+        <!-- Left Sidebar: Profile Details -->
         <div class="col-lg-4 col-md-5">
             <div class="profile-card">
-                <!-- Using Database Image or Fallback -->
                 <img src="{{ $employee->image_path ? asset($employee->image_path) : 'https://ui-avatars.com/api/?name='.urlencode($employee->name).'&background=5867dd&color=fff&size=128' }}" alt="Profile" class="profile-avatar">
-                <h4 class="mb-1 text-dark font-weight-bold">{{ $employee->name }}</h4>
-                <p class="text-muted mb-2">{{ $employee->position }} | ID: #{{ $employee->id }}</p>
+                <h3 class="font-weight-bold text-dark mb-1">{{ $employee->name }}</h3>
+                <p class="text-muted mb-3">{{ $employee->position }} | ID: #{{ $employee->id }}</p>
                 
-                <div class="mt-3 border-top pt-3">
-                    <p class="text-muted text-sm mb-1">Overall Attendance (This Year)</p>
-                    <div class="attendance-badge">
-                        <i class="ti-stats-up mr-1"></i> {{ $attendancePercentage ?? '0' }}% Present
-                    </div>
+                <div class="attendance-badge">
+                    <i class="ti-stats-up mr-1"></i> {{ $attendancePercentage ?? '0' }}% Present This Year
                 </div>
-
-                <!-- Contact Details from DB -->
-                <div class="mt-4 text-left">
-                    <p class="mb-2"><i class="ti-email text-primary mr-2"></i> {{ $employee->email ?? 'N/A' }}</p>
-                    <p class="mb-2"><i class="ti-mobile text-primary mr-2"></i> {{ $employee->mobile ?? 'N/A' }}</p>
+                
+                <hr class="my-4">
+                
+                <div class="text-left">
+                    <!-- EMAIL SECTION -->
+                    <div class="mb-3 d-flex align-items-center">
+                        <i class="ti-email text-primary mr-3" style="font-size: 18px;"></i> 
+                        @if(!empty($employee->email))
+                            <span class="font-weight-bold">{{ $employee->email }}</span>
+                        @else
+                            <span class="action-badge" title="Please contact your Manager or HR to update your email.">
+                                <i class="ti-info-alt mr-1"></i> Update via TL/Manager
+                            </span>
+                        @endif
+                    </div>
+                    
+                    <!-- MOBILE SECTION -->
+                    <div class="mb-2 d-flex align-items-center">
+                        <i class="ti-mobile text-primary mr-3" style="font-size: 18px;"></i> 
+                        @if(!empty($employee->mobile))
+                            <span class="font-weight-bold">{{ $employee->mobile }}</span>
+                        @else
+                            <span class="action-badge" title="Please contact your Manager or HR to update your mobile number.">
+                                <i class="ti-info-alt mr-1"></i> Update via TL/Manager
+                            </span>
+                        @endif
+                    </div>
                 </div>
             </div>
 
-            <!-- Overtime Redirect Card -->
-            <div class="ot-card shadow-sm">
+            <div class="ot-card">
                 <div>
-                    <h5 class="text-dark font-weight-bold mb-1"><i class="ti-time text-warning mr-1"></i> Over Time Data</h5>
-                    <p class="text-muted text-sm mb-0">Extra hours worked.</p>
+                    <h5 class="font-weight-bold mb-1 text-white">Overtime Wallet</h5>
+                    <p class="text-light mb-0" style="opacity: 0.8; font-size: 13px;">View extra hours</p>
                 </div>
-                <a href="/overtime?employee_id={{ $employee->id }}" class="btn btn-warning font-weight-bold shadow-sm">View OT</a>
+                <a href="/overtime?employee_id={{ $employee->id }}" class="btn btn-light text-dark font-weight-bold rounded-pill px-4">View</a>
             </div>
         </div>
 
-        <!-- Right Side: Monthly Logs Dropdown (Accordion) fetched from DB -->
+        <!-- Right Side: VISUAL CALENDAR -->
         <div class="col-lg-8 col-md-7">
-            <div class="accordion month-accordion" id="attendanceAccordion">
+            <div class="calendar-container">
+                <h4 class="font-weight-bold text-dark mb-4">Attendance Calendar Tracker</h4>
                 
-                <!-- Controller should pass grouped logs (e.g., $monthlyLogs) -->
                 @if(isset($monthlyLogs) && count($monthlyLogs) > 0)
                     @foreach($monthlyLogs as $month => $logs)
-                        <div class="card">
-                            <div class="card-header {{ $loop->first ? '' : 'collapsed' }}" id="heading{{ $loop->index }}" data-toggle="collapse" data-target="#collapse{{ $loop->index }}" aria-expanded="{{ $loop->first ? 'true' : 'false' }}">
-                                <h5>{{ $month }} <i class="ti-angle-down"></i></h5>
-                            </div>
-                            <div id="collapse{{ $loop->index }}" class="collapse {{ $loop->first ? 'show' : '' }}" data-parent="#attendanceAccordion">
-                                <div class="card-body p-0">
-                                    <div class="table-responsive">
-                                        <table class="table table-hover mb-0">
-                                            <thead class="bg-light">
-                                                <tr>
-                                                    <th>Date</th>
-                                                    <th>Time In</th>
-                                                    <th>Time Out</th>
-                                                    <th>Net Hours</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach($logs as $log)
-                                                    <tr>
-                                                        <td class="font-weight-bold">{{ \Carbon\Carbon::parse($log->date)->format('d M, D') }}</td>
-                                                        <td>{{ $log->time_in ? \Carbon\Carbon::parse($log->time_in)->format('h:i A') : '-' }}</td>
-                                                        <td>{{ $log->time_out ? \Carbon\Carbon::parse($log->time_out)->format('h:i A') : '-' }}</td>
-                                                        <td class="font-weight-bold {{ $log->net_hours == '0h 0m' ? 'text-danger' : 'text-primary' }}">{{ $log->net_hours ?? '0h 0m' }}</td>
-                                                        <td>
-                                                            @if($log->status == 'Present')
-                                                                <span class="badge badge-success px-2 py-1">Present</span>
-                                                            @elseif($log->status == 'In Progress')
-                                                                <span class="badge badge-warning px-2 py-1 text-dark">In Progress</span>
-                                                            @elseif($log->status == 'Break Time')
-                                                                <span class="badge px-2 py-1 text-white" style="background-color: #3b82f6;">Break Time</span>
-                                                            @else
-                                                                <span class="badge badge-danger px-2 py-1">Absent</span>
-                                                            @endif
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
+                        <h5 class="text-primary mt-4 mb-3 border-bottom pb-2">{{ $month }}</h5>
+                        
+                        <div class="calendar-grid">
+                            @foreach($logs as $log)
+                                @php
+                                    $bgClass = 'status-holiday'; 
+                                    
+                                    if($log->status == 'Present') {
+                                        $bgClass = 'status-completed'; 
+                                    } elseif($log->status == 'In Progress' || $log->status == 'Partial Shift') {
+                                        $bgClass = 'status-progress'; 
+                                    } elseif($log->status == 'Break Time') {
+                                        $bgClass = 'status-break'; 
+                                    } elseif($log->status == 'Absent' || $log->status == 'Missing Punch') {
+                                        $bgClass = 'status-absent'; 
+                                    }
+                                @endphp
+                                
+                                <div class="day-card {{ $bgClass }}">
+                                    <div class="day-name">{{ \Carbon\Carbon::parse($log->date)->format('D') }}</div>
+                                    <div class="date-num">{{ \Carbon\Carbon::parse($log->date)->format('d') }}</div>
+                                    <div class="status-text">{{ $log->status }}</div>
+                                    <div class="hours-logged"><i class="ti-time"></i> {{ $log->net_hours ?? '0h' }}</div>
                                 </div>
-                            </div>
+                            @endforeach
                         </div>
                     @endforeach
                 @else
-                    <div class="text-center py-5 text-muted">
-                        No attendance records found for this employee.
+                    <div class="text-center py-5">
+                        <i class="ti-calendar text-muted" style="font-size: 50px;"></i>
+                        <p class="text-muted mt-3">No logs found for this employee yet.</p>
                     </div>
                 @endif
-
-            </div>
-        </div>
-        
-    <!-- LOGIC: DEFAULT STATE (When page is opened directly without search) -->
-    @else
-        <div class="col-12">
-            <div class="not-found-card mx-auto" style="max-width: 600px; border-color: #e2e8f0;">
-                <i class="ti-search text-primary" style="font-size: 60px; margin-bottom: 20px; display: inline-block;"></i>
-                <h3 class="text-dark font-weight-bold">Search for an Employee</h3>
-                <p class="text-muted mt-2" style="font-size: 15px;">
-                    Enter an Employee Name or ID in the search box above to view their full attendance logs and reports.
-                </p>
+                
             </div>
         </div>
     @endif
-
 </div>
 @endsection

@@ -23,10 +23,9 @@ class AttendanceController extends Controller
                         ->first();
 
             if ($employee) {
-                // டேட்டாபேஸிலிருந்து முழு ரெக்கார்டையும் எடுப்பது
                 $rawLogs = Attendance::where('emp_id', $employee->id)->get();
 
-                // தேதியின் அடிப்படையில் பிரிப்பது
+                // Group strictly by Date
                 $groupedLogs = $rawLogs->groupBy(function($log) {
                     return Carbon::parse($log->attendance_date)->format('Y-m-d');
                 });
@@ -34,95 +33,71 @@ class AttendanceController extends Controller
                 $finalLogs = collect();
                 $presentDays = 0;
                 $totalDays = $groupedLogs->count();
+                $todayStr = Carbon::today()->format('Y-m-d');
 
                 foreach ($groupedLogs as $date => $dayLogs) {
-                    // நேரத்தின் அடிப்படையில் சரியாக வரிசைப்படுத்துவது
                     $dayLogs = $dayLogs->sortBy('attendance_time')->values();
+                    $lastLog = $dayLogs->last(); // Get the last action of that day
                     
                     $totalMins = 0;
-                    $logCount = $dayLogs->count();
-                    $isWorkingToday = false;
+                    $hasMissingPunchOut = false;
 
-                    // முதல் ஸ்டெப்: ஒரு நாளின் மொத்த வேலை நேரத்தைக் கணக்கிடுவது
+                    // 1. Calculate the entire day's total working minutes
                     foreach ($dayLogs as $log) {
-                        $actualMins = $log->worked_minutes;
-                        $cleanDate = Carbon::parse($log->attendance_date)->format('Y-m-d');
-                        
-                        if (!$actualMins && $log->attendance_time) {
-                            $checkIn = Carbon::parse($cleanDate . ' ' . $log->attendance_time);
-                            if ($log->check_out_time) {
-                                $checkOut = Carbon::parse($cleanDate . ' ' . $log->check_out_time);
-                                $actualMins = $checkIn->diffInMinutes($checkOut);
-                            } elseif (Carbon::parse($cleanDate)->isToday()) {
-                                $actualMins = $checkIn->diffInMinutes(Carbon::now());
-                                $isWorkingToday = true;
-                            }
-                        }
-                        $totalMins += (int)$actualMins;
-                    }
-
-                    // இரண்டாவது ஸ்டெப்: ஒவ்வொரு ரெக்கார்டுக்கும் சரியான ஸ்டேட்டஸ் கொடுப்பது
-                    foreach ($dayLogs as $index => $log) {
-                        $isLastLog = ($index === $logCount - 1);
-                        $cleanDate = Carbon::parse($log->attendance_date)->format('Y-m-d');
-                        
-                        // இந்த குறிப்பிட்ட செஷனுக்கான நிமிடங்களைக் கணக்கிடுவது
                         $sessionMins = $log->worked_minutes;
                         if (!$sessionMins && $log->attendance_time) {
-                            $checkIn = Carbon::parse($cleanDate . ' ' . $log->attendance_time);
                             if ($log->check_out_time) {
-                                $checkOut = Carbon::parse($cleanDate . ' ' . $log->check_out_time);
-                                $sessionMins = $checkIn->diffInMinutes($checkOut);
-                            } elseif (Carbon::parse($cleanDate)->isToday()) {
-                                $sessionMins = $checkIn->diffInMinutes(Carbon::now());
+                                $sessionMins = Carbon::parse($date . ' ' . $log->attendance_time)->diffInMinutes(Carbon::parse($date . ' ' . $log->check_out_time));
+                            } elseif ($date === $todayStr) {
+                                $sessionMins = Carbon::parse($date . ' ' . $log->attendance_time)->diffInMinutes(Carbon::now());
                             } else {
-                                $sessionMins = 0;
+                                // Past date but employee forgot to punch out!
+                                $hasMissingPunchOut = true;
                             }
                         }
-                        
-                        $hours = floor((int)$sessionMins / 60);
-                        $mins = (int)$sessionMins % 60;
-
-                        // ==========================================
-                        // STUPID-PROOF DYNAMIC STATUS LOGIC
-                        // ==========================================
-                        $status = 'Absent';
-                        if (empty($log->check_out_time)) {
-                            $status = 'In Progress'; // செக்கவுட் ஆகவில்லை என்றால் In Progress
-                        } else {
-                            if (!$isLastLog) {
-                                $status = 'Break Time'; // இடைப்பட்ட செக்கவுட்கள் அனைத்தும் Break Time
-                            } else {
-                                // அன்றைய நாளின் கடைசி செக்கவுட்!
-                                if ($totalMins >= 540) {
-                                    $status = 'Present'; // மொத்த நேரம் 9 மணி நேரம் இருந்தால் Present
-                                } else {
-                                    $status = 'Absent'; // 9 மணி நேரத்திற்குக் குறைவு என்றால் Absent
-                                }
-                            }
-                        }
-
-                        // லாராவெல் ஆப்ஜெக்ட்டை விடுத்து, புதிய ஆப்ஜெக்ட்டை உருவாக்குவது (To prevent caching/overwrite issues)
-                        $finalLogs->push((object)[
-                            'date' => $log->attendance_date,
-                            'time_in' => $log->attendance_time,
-                            'time_out' => $log->check_out_time,
-                            'net_hours' => "{$hours}h {$mins}m",
-                            'status' => $status
-                        ]);
+                        $totalMins += (int)$sessionMins;
                     }
 
-                    // ஓவர்-ஆல் சதவீத கணக்கீடு (9 Hours Rule)
-                    if ($totalMins >= 540 || ($date === Carbon::today()->format('Y-m-d') && $isWorkingToday)) {
+                    $hours = floor($totalMins / 60);
+                    $mins = $totalMins % 60;
+
+                    // 2. DYNAMIC STATUS LOGIC (Strict checking)
+                    $status = 'Absent';
+
+                    if ($date === $todayStr && empty($lastLog->check_out_time)) {
+                        // Case A: Today & currently open
+                        if ($lastLog->shift_status === 'On Break') {
+                            $status = 'Break Time';
+                        } else {
+                            $status = 'In Progress';
+                        }
+                    } elseif ($date !== $todayStr && $hasMissingPunchOut) {
+                        // Case B: Past Date but forgot to punch out
+                        $status = 'Missing Punch';
+                    } else {
+                        // Case C: Day Completed (Check total hours)
+                        if ($totalMins >= 480) { // 8 Hours (480 mins) or more
+                            $status = 'Present';
+                        } elseif ($totalMins > 0) { // Less than 8 hours
+                            $status = 'Partial Shift';
+                        }
+                    }
+
+                    // Push exactly ONE record per date!
+                    $finalLogs->push((object)[
+                        'date' => $date,
+                        'net_hours' => "{$hours}h {$mins}m",
+                        'status' => $status
+                    ]);
+
+                    // Percentage calculation
+                    if ($totalMins >= 480 || ($date === $todayStr && empty($lastLog->check_out_time))) {
                         $presentDays++;
                     }
                 }
 
-                // UI-க்காக தேதியின் அடிப்படையில் லேட்டஸ்ட் முதலில் வரும்படி வரிசைப்படுத்துவது
-                $logs = $finalLogs->sortByDesc(function($log) {
-                    return Carbon::parse($log->date)->format('Y-m-d') . ' ' . $log->time_in;
-                })->values();
-
+                // Sort UI from newest to oldest date
+                $logs = $finalLogs->sortByDesc('date')->values();
                 $attendancePercentage = $totalDays > 0 ? round(($presentDays / $totalDays) * 100) : 0;
 
                 $monthlyLogs = $logs->groupBy(function($log) {
@@ -235,7 +210,7 @@ class AttendanceController extends Controller
             $breakMinutes = BreakLog::where('attendance_id', $attendance->id)->sum('duration_minutes');
 
             $attendance->worked_minutes = $totalMinutes - $breakMinutes;
-            $attendance->shift_status = ($attendance->worked_minutes >= 540) ? 'Full Shift' : 'Partial Shift';
+            $attendance->shift_status = ($attendance->worked_minutes >= 480) ? 'Full Shift' : 'Partial Shift'; // Updated to 8 hours rule
             
             $attendance->save();
         }
